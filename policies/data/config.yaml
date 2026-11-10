@@ -1,0 +1,7 @@
+# Organisation settings read by the policies. Copy this file into your own repository and change
+# the values; the rules stay the same. Keep `environments` in step with the naming module.
+naming:
+  org_pattern: "[a-z][a-z0-9]{1,11}"
+  environments: [dev, test, staging, prod]
+
+required_tags: [Name, Org, Environment, ManagedBy]

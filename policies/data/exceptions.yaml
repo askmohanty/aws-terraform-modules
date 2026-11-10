@@ -1,0 +1,10 @@
+# Reviewed exceptions to a policy rule for one resource. Every field is required, and an entry
+# stops applying after `expires`. Example:
+#
+# exceptions:
+#   - rule: sg-world-ingress
+#     address: module.bastion.aws_security_group.this
+#     reason: SSH bastion while the SSM migration completes
+#     approved_by: security-team
+#     expires: "2027-03-31T00:00:00Z"
+exceptions: []

@@ -1,0 +1,3 @@
+formatter: json
+settings:
+  escape: false

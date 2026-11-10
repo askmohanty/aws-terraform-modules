@@ -1,0 +1,10 @@
+s3-public-access-block
+s3-kms-encryption
+sg-world-ingress
+ebs-encryption
+iam-wildcard-admin
+iam-access-key
+kms-rotation
+required-tags
+naming
+no-exec-provisioners

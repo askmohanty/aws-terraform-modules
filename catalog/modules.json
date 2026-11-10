@@ -1,0 +1,213 @@
+{
+  "repository": "https://github.com/askmohanty/aws-terraform-modules",
+  "tier": 1,
+  "modules": [
+    {
+      "name": "naming",
+      "summary": "Builds resource names (`{org}-{environment}-{region_short}-{name}`) and the standard tag set every module applies.",
+      "source": "git::https://github.com/askmohanty/aws-terraform-modules.git//modules/naming?ref=naming/vX.Y.Z",
+      "release_tag_prefix": "naming/v",
+      "releases": "https://github.com/askmohanty/aws-terraform-modules/releases?q=naming%2Fv",
+      "inputs": [
+        {
+          "name": "allowed_environments",
+          "type": "list(string)",
+          "required": false,
+          "default": [
+            "dev",
+            "test",
+            "staging",
+            "prod"
+          ],
+          "description": "Environments this organisation uses. Keep it in step with the OPA policy data (`policies/data/config.yaml`)."
+        },
+        {
+          "name": "cost_centre",
+          "type": "string",
+          "required": false,
+          "default": null,
+          "description": "Cost centre, added as the `CostCentre` tag."
+        },
+        {
+          "name": "environment",
+          "type": "string",
+          "required": true,
+          "default": null,
+          "description": "Environment, the second part of every name. Must be one of `allowed_environments`."
+        },
+        {
+          "name": "extra_tags",
+          "type": "map(string)",
+          "required": false,
+          "default": {},
+          "description": "Additional tags. The standard tags (`Name`, `Org`, `Environment`, `Region`, `ManagedBy`, `Owner`, `CostCentre`) always win over these."
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "required": true,
+          "default": null,
+          "description": "What the resource is for, the last part of the name (e.g. `orders-db`)."
+        },
+        {
+          "name": "org",
+          "type": "string",
+          "required": true,
+          "default": null,
+          "description": "Short organisation code, the first part of every name (e.g. `acme`)."
+        },
+        {
+          "name": "owner",
+          "type": "string",
+          "required": false,
+          "default": null,
+          "description": "Team or person accountable for the resource, added as the `Owner` tag."
+        },
+        {
+          "name": "region",
+          "type": "string",
+          "required": true,
+          "default": null,
+          "description": "AWS region the resources live in (e.g. `eu-west-1`). Shortened in names: `eu-west-1` becomes `euw1`."
+        }
+      ],
+      "outputs": [
+        {
+          "name": "id",
+          "description": "Full resource name: `{org}-{environment}-{region_short}-{name}`, e.g. `acme-prod-euw1-orders-db`."
+        },
+        {
+          "name": "region_short",
+          "description": "Short region code used in names, e.g. `euw1`."
+        },
+        {
+          "name": "tags",
+          "description": "Tags every resource gets: `extra_tags` overlaid by the standard tags."
+        }
+      ],
+      "calls": []
+    },
+    {
+      "name": "s3-bucket",
+      "summary": "A private, encrypted, versioned S3 bucket that refuses public access and insecure transport.",
+      "source": "git::https://github.com/askmohanty/aws-terraform-modules.git//modules/s3-bucket?ref=s3-bucket/vX.Y.Z",
+      "release_tag_prefix": "s3-bucket/v",
+      "releases": "https://github.com/askmohanty/aws-terraform-modules/releases?q=s3-bucket%2Fv",
+      "inputs": [
+        {
+          "name": "access_logging",
+          "type": "object({\n    target_bucket = string\n    target_prefix = optional(string, \"\")\n  })",
+          "required": false,
+          "default": null,
+          "description": "Write server access logs to another bucket. Null turns access logging off."
+        },
+        {
+          "name": "context",
+          "type": "object({\n    org                  = string\n    environment          = string\n    region               = string\n    owner                = optional(string)\n    cost_centre          = optional(string)\n    extra_tags           = optional(map(string), {})\n    allowed_environments = optional(list(string), [\"dev\", \"test\", \"staging\", \"prod\"])\n  })",
+          "required": true,
+          "default": null,
+          "description": "Naming and tagging context shared by every module in a stack. See `modules/naming`."
+        },
+        {
+          "name": "force_destroy",
+          "type": "bool",
+          "required": false,
+          "default": false,
+          "description": "Allow `terraform destroy` to delete a bucket that still contains objects. Refused in `prod`."
+        },
+        {
+          "name": "kms_key_arn",
+          "type": "string",
+          "required": false,
+          "default": null,
+          "description": "Customer-managed KMS key for default encryption. When set, uploads that request a different key are denied. When null, the AWS-managed `aws/s3` key is used."
+        },
+        {
+          "name": "lifecycle_rules",
+          "type": "list(object({\n    id              = string\n    prefix          = optional(string, \"\")\n    expiration_days = optional(number)\n    transitions = optional(list(object({\n      days          = number\n      storage_class = string\n    })), [])\n  }))",
+          "required": false,
+          "default": [],
+          "description": "Extra lifecycle rules: expire or transition objects under a prefix."
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "required": true,
+          "default": null,
+          "description": "What the bucket is for (e.g. `orders-data`). The bucket is named `{org}-{environment}-{region_short}-{name}[-{name_suffix}]`."
+        },
+        {
+          "name": "name_suffix",
+          "type": "string",
+          "required": false,
+          "default": null,
+          "description": "Optional suffix appended to the bucket name, for global uniqueness (bucket names are unique across all AWS accounts). For example a short account ID or random string."
+        },
+        {
+          "name": "noncurrent_version_expiration_days",
+          "type": "number",
+          "required": false,
+          "default": 90,
+          "description": "Delete previous object versions this many days after they stop being current. Null keeps them forever."
+        },
+        {
+          "name": "policy_json",
+          "type": "string",
+          "required": false,
+          "default": null,
+          "description": "Extra bucket policy (JSON from `jsonencode` or `aws_iam_policy_document`), merged with the built-in deny statements (TLS, KMS key). Statements that allow access to everyone (`Principal: \"*\"`) are refused."
+        },
+        {
+          "name": "tags",
+          "type": "map(string)",
+          "required": false,
+          "default": {},
+          "description": "Extra tags. The standard naming tags always win."
+        },
+        {
+          "name": "versioning_enabled",
+          "type": "bool",
+          "required": false,
+          "default": true,
+          "description": "Keep previous versions of overwritten and deleted objects. Refused as false in `prod`."
+        }
+      ],
+      "outputs": [
+        {
+          "name": "arn",
+          "description": "Bucket ARN, for IAM policies (`<arn>` for the bucket, `<arn>/*` for objects)."
+        },
+        {
+          "name": "bucket_regional_domain_name",
+          "description": "Region-specific domain name, for CloudFront origins and VPC endpoints."
+        },
+        {
+          "name": "id",
+          "description": "Bucket name as created."
+        },
+        {
+          "name": "name",
+          "description": "Bucket name, built by the naming convention. Known at plan time."
+        },
+        {
+          "name": "region",
+          "description": "Region the bucket lives in."
+        },
+        {
+          "name": "tags",
+          "description": "Tags applied to the bucket."
+        }
+      ],
+      "calls": [
+        {
+          "name": "bucket",
+          "source": "git::https://github.com/terraform-aws-modules/terraform-aws-s3-bucket.git"
+        },
+        {
+          "name": "naming",
+          "source": "../naming"
+        }
+      ]
+    }
+  ]
+}

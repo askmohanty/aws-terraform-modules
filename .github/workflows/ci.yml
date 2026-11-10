@@ -1,0 +1,226 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  OPA_VERSION: v1.22.3
+  CONFTEST_VERSION: 0.71.1
+  TERRAFORM_DOCS_VERSION: v0.24.0
+
+jobs:
+  changes:
+    name: Find changed modules
+    runs-on: ubuntu-latest
+    outputs:
+      modules: ${{ steps.find.outputs.modules }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: List modules to check
+        id: find
+        env:
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          set -euo pipefail
+          all=$(find modules -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort)
+          if [ -z "$BASE" ] || ! git cat-file -e "$BASE" 2>/dev/null \
+             || git diff --name-only "$BASE" HEAD | grep -qvE '^modules/'; then
+            selected="$all"   # shared files changed (or first push): check everything
+          else
+            selected=$(git diff --name-only "$BASE" HEAD | grep -oE '^modules/[^/]+' | cut -d/ -f2 | sort -u)
+          fi
+          echo "Modules to check: ${selected:-none}"
+          echo "modules=$(printf '%s\n' $selected | jq -R . | jq -cs 'map(select(length > 0))')" >> "$GITHUB_OUTPUT"
+
+  test:
+    name: ${{ matrix.module }} (${{ matrix.cli.name }} ${{ matrix.cli.version }})
+    needs: changes
+    if: needs.changes.outputs.modules != '[]'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        module: ${{ fromJSON(needs.changes.outputs.modules) }}
+        cli:
+          - { name: terraform, version: 1.9.8 }   # minimum supported
+          - { name: terraform, version: 1.17.1 }  # latest
+          - { name: tofu, version: 1.13.9 }       # OpenTofu latest
+    defaults:
+      run:
+        working-directory: modules/${{ matrix.module }}
+    env:
+      TF: ${{ matrix.cli.name }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Terraform
+        if: matrix.cli.name == 'terraform'
+        uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: ${{ matrix.cli.version }}
+          terraform_wrapper: false
+      - name: Set up OpenTofu
+        if: matrix.cli.name == 'tofu'
+        uses: opentofu/setup-opentofu@a1320f892987e89d278cc92dc5adc984fb93aca4 # v2.0.2
+        with:
+          tofu_version: ${{ matrix.cli.version }}
+          tofu_wrapper: false
+      - name: Format
+        run: $TF fmt -check -recursive
+      - name: Validate module
+        run: $TF init -backend=false -input=false && $TF validate
+      - name: Test (mocked providers, no cloud credentials)
+        run: $TF test
+      - name: Validate example
+        working-directory: modules/${{ matrix.module }}/examples/basic
+        run: $TF init -backend=false -input=false && $TF validate
+
+  lint:
+    name: ${{ matrix.module }} (tflint, docs)
+    needs: changes
+    if: needs.changes.outputs.modules != '[]'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        module: ${{ fromJSON(needs.changes.outputs.modules) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: terraform-linters/setup-tflint@6ffdbaa3be476b3431f7275c26966ef32ff60337 # v6.3.2
+        with:
+          tflint_version: v0.66.0
+      - name: tflint
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          MODULE: ${{ matrix.module }}
+        run: |
+          set -euo pipefail
+          tflint --init --config "$GITHUB_WORKSPACE/.tflint.hcl"
+          tflint --chdir "modules/$MODULE" --config "$GITHUB_WORKSPACE/.tflint.hcl"
+      - name: Install terraform-docs (checksum verified)
+        run: |
+          set -euo pipefail
+          a="terraform-docs-$TERRAFORM_DOCS_VERSION-linux-amd64.tar.gz"
+          base="https://github.com/terraform-docs/terraform-docs/releases/download/$TERRAFORM_DOCS_VERSION"
+          curl -sfLO "$base/$a"
+          curl -sfLo sums "$base/terraform-docs-$TERRAFORM_DOCS_VERSION.sha256sum"
+          grep " $a\$" sums | sha256sum -c -
+          tar -xzf "$a" terraform-docs && sudo install terraform-docs /usr/local/bin/
+      - name: README inputs and outputs are up to date
+        env:
+          MODULE: ${{ matrix.module }}
+        run: terraform-docs -c .terraform-docs.yml --output-check "modules/$MODULE"
+
+  policy:
+    name: Policies (unit tests, module plans, insecure fixture)
+    needs: changes
+    runs-on: ubuntu-latest
+    services:
+      localstack:
+        # AWS emulator so plans can run without an AWS account. Pinned by digest (2026.10.6).
+        image: localstack/localstack@sha256:f94401988db4c01a5b2634d37d698a9b11c93f74c1ad0f7a8849f5ebd73dcbdc
+        ports:
+          - 4566:4566
+    env:
+      AWS_ENDPOINT_URL: http://localhost.localstack.cloud:4566
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: 1.17.1
+          terraform_wrapper: false
+      - name: Install OPA and Conftest (checksum verified)
+        run: |
+          set -euo pipefail
+          base="https://github.com/open-policy-agent/opa/releases/download/$OPA_VERSION"
+          curl -sfLo opa "$base/opa_linux_amd64_static"
+          echo "$(curl -sfL "$base/opa_linux_amd64_static.sha256" | cut -d' ' -f1)  opa" | sha256sum -c -
+          sudo install opa /usr/local/bin/
+          a="conftest_${CONFTEST_VERSION}_Linux_x86_64.tar.gz"
+          base="https://github.com/open-policy-agent/conftest/releases/download/v$CONFTEST_VERSION"
+          curl -sfLO "$base/$a"
+          curl -sfLo sums "$base/checksums.txt"
+          grep " $a\$" sums | sha256sum -c -
+          tar -xzf "$a" conftest && sudo install conftest /usr/local/bin/
+      - name: Rego checks and unit tests
+        run: |
+          set -euo pipefail
+          opa check --strict policies/lib policies/aws policies/common
+          test -z "$(opa fmt --list policies)" || { echo "::error::Run opa fmt -w policies"; exit 1; }
+          opa test policies/lib policies/aws policies/common -v
+      - name: Wait for LocalStack
+        run: |
+          for i in $(seq 1 60); do curl -sf http://localhost:4566/_localstack/health >/dev/null && exit 0; sleep 2; done
+          echo "::error::LocalStack did not start"; exit 1
+      - name: Module examples pass the policies
+        env:
+          MODULES: ${{ needs.changes.outputs.modules }}
+        run: |
+          set -euo pipefail
+          for m in $(jq -r '.[]' <<<"$MODULES"); do
+            dir="modules/$m/examples/basic"
+            [ -d "$dir" ] || continue
+            echo "::group::$m"
+            (cd "$dir" && terraform init -backend=false -input=false >/dev/null \
+              && terraform plan -input=false -out tfplan >/dev/null \
+              && terraform show -json tfplan > plan.json)
+            conftest test "$dir/plan.json" -p policies --data policies/data --all-namespaces
+            echo "::endgroup::"
+          done
+      - name: The insecure fixture is denied by every expected rule
+        run: bash scripts/check-policy-fixture.sh
+
+  catalog:
+    name: Agent catalog is up to date
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install terraform-docs (checksum verified)
+        run: |
+          set -euo pipefail
+          a="terraform-docs-$TERRAFORM_DOCS_VERSION-linux-amd64.tar.gz"
+          base="https://github.com/terraform-docs/terraform-docs/releases/download/$TERRAFORM_DOCS_VERSION"
+          curl -sfLO "$base/$a"
+          curl -sfLo sums "$base/terraform-docs-$TERRAFORM_DOCS_VERSION.sha256sum"
+          grep " $a\$" sums | sha256sum -c -
+          tar -xzf "$a" terraform-docs && sudo install terraform-docs /usr/local/bin/
+      - name: Regenerate and compare
+        run: |
+          set -euo pipefail
+          bash scripts/generate-catalog.sh
+          git diff --exit-code -- catalog llms.txt || { echo "::error::Run scripts/generate-catalog.sh and commit the result."; exit 1; }
+
+  ci-ok:
+    name: CI result
+    if: always()
+    needs: [changes, test, lint, policy, catalog]
+    runs-on: ubuntu-latest
+    steps:
+      - name: All checks passed
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          for r in $RESULTS; do
+            case "$r" in success|skipped) ;; *) echo "A job finished with: $r"; exit 1 ;; esac
+          done

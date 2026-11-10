@@ -1,0 +1,189 @@
+# Reusable plan -> policy -> apply pipeline for tier-2 stacks. A tier-2 repository calls it:
+#
+#   jobs:
+#     deploy:
+#       uses: askmohanty/aws-terraform-modules/.github/workflows/tier2-deploy.yml@<commit-sha>
+#       with:
+#         environment: dev
+#         working-directory: stacks/orders
+#         aws-region: eu-west-1
+#         plan-role-arn: arn:aws:iam::111122223333:role/acme-dev-euw1-orders-plan
+#         apply-role-arn: arn:aws:iam::111122223333:role/acme-dev-euw1-orders-apply
+#         policy-ref: <same commit-sha>
+#       permissions:
+#         contents: read
+#         id-token: write
+#         pull-requests: write
+#
+# Pull requests: plan with the read-only role, run the OPA policies, post the result. Pushes to the
+# default branch: the same, then apply that exact plan file. Give the GitHub Environment named by
+# `environment` required reviewers for prod, so prod applies wait for a person.
+name: Tier-2 deploy
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: GitHub Environment (and stack environment) to deploy, e.g. dev or prod.
+        type: string
+        required: true
+      working-directory:
+        description: Directory of the tier-2 root module.
+        type: string
+        required: true
+      aws-region:
+        type: string
+        required: true
+      plan-role-arn:
+        description: Read-only role assumed through GitHub OIDC for planning.
+        type: string
+        required: true
+      apply-role-arn:
+        description: Role assumed through GitHub OIDC for applying.
+        type: string
+        required: true
+      policy-ref:
+        description: Commit or tag of askmohanty/aws-terraform-modules whose policies to enforce. Use the same SHA as this workflow.
+        type: string
+        required: true
+      policy-data-dir:
+        description: Optional directory in the tier-2 repo with your own config.yaml and exceptions.yaml.
+        type: string
+        default: ""
+      terraform-version:
+        type: string
+        default: 1.17.1
+
+permissions: {}
+
+env:
+  CONFTEST_VERSION: 0.71.1
+
+jobs:
+  plan:
+    name: Plan and policy check (${{ inputs.environment }})
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      pull-requests: write
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-directory }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Check out the policies
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: askmohanty/aws-terraform-modules
+          ref: ${{ inputs.policy-ref }}
+          path: .tier1
+          persist-credentials: false
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: ${{ inputs.terraform-version }}
+          terraform_wrapper: false
+      - name: Install Conftest (checksum verified)
+        working-directory: .
+        run: |
+          set -euo pipefail
+          a="conftest_${CONFTEST_VERSION}_Linux_x86_64.tar.gz"
+          base="https://github.com/open-policy-agent/conftest/releases/download/v$CONFTEST_VERSION"
+          curl -sfLO "$base/$a"
+          curl -sfLo sums "$base/checksums.txt"
+          grep " $a\$" sums | sha256sum -c -
+          tar -xzf "$a" conftest && sudo install conftest /usr/local/bin/
+      - name: Read-only AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ inputs.plan-role-arn }}
+          aws-region: ${{ inputs.aws-region }}
+      - name: Format and validate
+        run: |
+          set -euo pipefail
+          terraform fmt -check -recursive
+          terraform init -input=false
+          terraform validate
+      - name: Plan
+        run: |
+          set -euo pipefail
+          terraform plan -input=false -out tfplan
+          terraform show -json tfplan > plan.json
+          terraform show -no-color tfplan > plan.txt
+      - name: Policy check (any denial fails the job)
+        env:
+          WORKSPACE: ${{ github.workspace }}
+          DATA_DIR: ${{ inputs.policy-data-dir }}
+        run: |
+          set -euo pipefail
+          data="$WORKSPACE/.tier1/policies/data"
+          [ -n "$DATA_DIR" ] && data="$WORKSPACE/$DATA_DIR"
+          conftest test plan.json -p "$WORKSPACE/.tier1/policies" --data "$data" --all-namespaces --no-color | tee policy.txt
+      - name: Summary
+        if: always()
+        env:
+          STACK_ENV: ${{ inputs.environment }}
+        run: |
+          {
+            echo "### Plan ($STACK_ENV)"
+            echo '```'; tail -n 40 plan.txt 2>/dev/null || echo "no plan"; echo '```'
+            echo "### Policy check"
+            echo '```'; cat policy.txt 2>/dev/null || echo "not run"; echo '```'
+          } | tee summary.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Post on the pull request
+        if: always() && github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+        run: gh pr comment "$PR" --body-file summary.md
+      - name: Keep the plan for apply and audit
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: tfplan-${{ inputs.environment }}
+          path: |
+            ${{ inputs.working-directory }}/tfplan
+            ${{ inputs.working-directory }}/plan.json
+            ${{ inputs.working-directory }}/policy.txt
+          retention-days: 90
+
+  apply:
+    name: Apply (${{ inputs.environment }})
+    needs: plan
+    if: github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}   # prod: required reviewers approve here, after seeing the plan above
+    concurrency:
+      group: apply-${{ inputs.environment }}-${{ inputs.working-directory }}
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-directory }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: ${{ inputs.terraform-version }}
+          terraform_wrapper: false
+      - name: Download the reviewed plan
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: tfplan-${{ inputs.environment }}
+          path: ${{ inputs.working-directory }}
+      - name: Deploy credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ inputs.apply-role-arn }}
+          aws-region: ${{ inputs.aws-region }}
+      - name: Apply exactly the planned changes
+        run: |
+          set -euo pipefail
+          terraform init -input=false
+          terraform apply -input=false tfplan

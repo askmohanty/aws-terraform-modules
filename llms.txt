@@ -1,0 +1,11 @@
+# aws-terraform-modules
+
+> Hardened tier-1 Terraform modules for AWS. Compose them into tier-2 stacks; never bypass their guardrails.
+
+Read first: [AGENTS.md](AGENTS.md) (rules for writing and deploying tier 2), [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/SECURITY-CONTROLS.md](docs/SECURITY-CONTROLS.md).
+Machine-readable catalog of every input and output: [catalog/modules.json](catalog/modules.json).
+
+## Modules
+
+- [naming](modules/naming/README.md): Builds resource names (`{org}-{environment}-{region_short}-{name}`) and the standard tag set every module applies.
+- [s3-bucket](modules/s3-bucket/README.md): A private, encrypted, versioned S3 bucket that refuses public access and insecure transport.

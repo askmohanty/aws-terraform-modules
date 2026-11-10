@@ -16,7 +16,7 @@ Nothing: it computes values. Every other module calls it internally with `Org` a
 
 ```hcl
 module "name" {
-  source = "git::https://github.com/askmohanty/aws-terraform-modules.git//modules/naming?ref=naming/v0.1.0" # x-release-please-version
+  source = "git::https://github.com/askmohanty/aws-terraform-modules.git//modules/naming?ref=naming/v1.0.0" # x-release-please-version
 
   org         = "acme"
   environment = "prod"

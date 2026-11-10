@@ -77,11 +77,11 @@ The reusable workflow [`tier2-deploy.yml`](https://github.com/askmohanty/terrafo
 | Name | Version |
 |---|---|
 | Terraform | >= 1.9 (OpenTofu also tested) |
-| AWS provider | >= 6.44, < 7.0 |
+| AWS provider | >= 6.0, < 7.0 |
 
 ## Documentation
 
-- [Architecture](https://github.com/askmohanty/terraform-aws-hardened-modules/blob/main/docs/ARCHITECTURE.md): tiers, wrapping, naming, policies, deployment
+- [Architecture](https://github.com/askmohanty/terraform-aws-hardened-modules/blob/main/docs/ARCHITECTURE.md): tiers, naming, policies, deployment
 - [Security controls](https://github.com/askmohanty/terraform-aws-hardened-modules/blob/main/docs/SECURITY-CONTROLS.md): mapped to OWASP Top 10:2025, the OWASP CI/CD Top 10 and the OWASP Top 10 for Agentic Applications 2026
 - [Contributing](https://github.com/askmohanty/terraform-aws-hardened-modules/blob/main/CONTRIBUTING.md): the standard every module meets
 - [Security policy](https://github.com/askmohanty/terraform-aws-hardened-modules/blob/main/SECURITY.md): reporting a vulnerability

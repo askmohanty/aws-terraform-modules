@@ -54,7 +54,7 @@ module "bucket" {
 | Name | Version |
 | ---- | ------- |
 | terraform | >= 1.9 |
-| aws | >= 6.44, < 7.0 |
+| aws | >= 6.0, < 7.0 |
 
 ## Providers
 

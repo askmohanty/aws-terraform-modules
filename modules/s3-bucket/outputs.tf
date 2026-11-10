@@ -5,22 +5,22 @@ output "name" {
 
 output "id" {
   description = "Bucket name as created."
-  value       = module.bucket.s3_bucket_id
+  value       = aws_s3_bucket.this.id
 }
 
 output "arn" {
   description = "Bucket ARN, for IAM policies (`<arn>` for the bucket, `<arn>/*` for objects)."
-  value       = module.bucket.s3_bucket_arn
+  value       = aws_s3_bucket.this.arn
 }
 
 output "bucket_regional_domain_name" {
   description = "Region-specific domain name, for CloudFront origins and VPC endpoints."
-  value       = module.bucket.s3_bucket_bucket_regional_domain_name
+  value       = aws_s3_bucket.this.bucket_regional_domain_name
 }
 
 output "region" {
   description = "Region the bucket lives in."
-  value       = module.bucket.s3_bucket_region
+  value       = aws_s3_bucket.this.region
 }
 
 output "tags" {

@@ -1,39 +1,107 @@
-# s3-bucket
+# AWS S3 bucket Terraform module
 
 A private, encrypted, versioned S3 bucket that refuses public access and insecure transport.
 
-## What it creates
+Creates the bucket with ownership controls (ACLs disabled), a public access block, versioning, KMS default encryption, lifecycle rules, optional server access logging and a bucket policy.
 
-The bucket, its ownership controls (ACLs disabled), public access block, versioning, KMS default encryption, lifecycle rules, an optional access-logging target and a bucket policy.
+## Security built in
 
-## Security guarantees
+These are always on; no input turns them off:
 
-Callers cannot turn these off:
-
-- All four public access block settings on; ACLs disabled (`BucketOwnerEnforced`).
-- Default encryption with KMS (the `aws/s3` key, or `kms_key_arn`). With `kms_key_arn` set, uploads naming another key are denied.
-- The bucket policy denies requests without TLS and TLS older than 1.2.
-- A `policy_json` that allows access to everyone (`Principal: "*"`, including inside an `AWS` list) is refused.
-- In `prod`: `force_destroy` is refused and versioning cannot be turned off.
-- Incomplete multipart uploads are cleaned up after 7 days.
+- **No public access.** All four public access block settings are on and ACLs are disabled (`BucketOwnerEnforced`). A `policy_json` that grants access to everyone (`Principal: "*"`, also inside an `AWS` list) is refused at plan time.
+- **Encrypted at rest.** Default encryption is SSE-KMS with S3 Bucket Keys, using the `aws/s3` key or your `kms_key_arn`. With a customer key, uploads that request a different key are denied by the bucket policy.
+- **Encrypted in transit.** The bucket policy denies requests without TLS and requests using TLS older than 1.2.
+- **Recoverable.** Versioning is on by default; previous versions expire after 90 days (configurable) and unfinished multipart uploads are removed after 7 days.
+- **Stricter in prod.** With `Environment = "prod"`, `force_destroy = true` and `versioning_enabled = false` are refused.
+- **Named and tagged by convention.** The name is `{Org}-{Environment}-{region}-{name}` from the provider's `default_tags` and region; the module adds `Name`, `Region` and `ManagedBy` tags.
 
 ## Usage
+
+Every example assumes the stack's facts are set once on the provider:
 
 ```hcl
 provider "aws" {
   region = "eu-west-1"
+
   default_tags {
-    tags = { Org = "acme", Environment = "prod", Owner = "orders-team" }
+    tags = {
+      Org         = "acme"
+      Environment = "prod"
+      Owner       = "orders-team"
+    }
   }
 }
+```
 
+### Private bucket with the secure defaults
+
+```hcl
 module "orders_data" {
   source  = "askmohanty/hardened-modules/aws//modules/s3-bucket"
   version = "0.3.0" # x-release-please-version
 
-  name        = "orders-data"   # -> acme-prod-euw1-orders-data-a1b2
-  name_suffix = "a1b2"          # bucket names are global; add a suffix to avoid collisions
-  kms_key_arn = module.orders_key.arn
+  name        = "orders-data" # -> acme-prod-euw1-orders-data-a1b2
+  name_suffix = "a1b2"        # bucket names are global; a suffix avoids collisions
+}
+```
+
+### Bucket encrypted with a customer-managed KMS key
+
+```hcl
+module "orders_data" {
+  source  = "askmohanty/hardened-modules/aws//modules/s3-bucket"
+  version = "0.3.0" # x-release-please-version
+
+  name        = "orders-data"
+  name_suffix = "a1b2"
+  kms_key_arn = "arn:aws:kms:eu-west-1:111122223333:key/1234abcd-12ab-34cd-56ef-1234567890ab"
+}
+```
+
+### Bucket with access logging and lifecycle rules
+
+```hcl
+module "exports" {
+  source  = "askmohanty/hardened-modules/aws//modules/s3-bucket"
+  version = "0.3.0" # x-release-please-version
+
+  name        = "exports"
+  name_suffix = "a1b2"
+
+  access_logging = {
+    target_bucket = "acme-prod-euw1-access-logs-a1b2"
+    target_prefix = "exports/"
+  }
+
+  lifecycle_rules = [
+    { id = "expire-tmp", prefix = "tmp/", expiration_days = 7 },
+    { id = "archive", prefix = "reports/", transitions = [{ days = 30, storage_class = "STANDARD_IA" }, { days = 180, storage_class = "GLACIER_IR" }] },
+  ]
+}
+```
+
+### Bucket with a custom policy
+
+Your statements are added after the built-in deny statements. Grant access to specific principals only.
+
+```hcl
+module "reports" {
+  source  = "askmohanty/hardened-modules/aws//modules/s3-bucket"
+  version = "0.3.0" # x-release-please-version
+
+  name        = "reports"
+  name_suffix = "a1b2"
+
+  policy_json = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Sid       = "ReadForReporting"
+      Effect    = "Allow"
+      Principal = { AWS = "arn:aws:iam::111122223333:role/reporting" }
+      Action    = "s3:GetObject"
+      Resource  = "arn:aws:s3:::acme-prod-euw1-reports-a1b2/*"
+    }]
+  })
 }
 ```
 
@@ -48,26 +116,27 @@ variable "buckets" {
 }
 
 module "bucket" {
-  source  = "askmohanty/hardened-modules/aws//modules/s3-bucket"
-  version = "0.3.0" # x-release-please-version
+  source   = "askmohanty/hardened-modules/aws//modules/s3-bucket"
+  version  = "0.3.0" # x-release-please-version
   for_each = var.buckets
 
-  name               = each.key              # orders-data -> acme-prod-euw1-orders-data
+  name               = each.key # orders-data -> acme-prod-euw1-orders-data
   versioning_enabled = each.value.versioning_enabled
   lifecycle_rules    = each.value.lifecycle_rules
 }
 ```
 
-See [examples/s3-bucket-many](https://github.com/askmohanty/terraform-aws-hardened-modules/blob/main/examples/s3-bucket-many/main.tf).
+## Notes
 
-## Composes with
+- **Set `Org` and `Environment` on the provider.** The module reads them from `default_tags` and stops the plan with the exact fix if either is missing. Do not repeat them in `tags`; stack-level keys in `tags` are ignored.
+- **Bucket names are global.** Two accounts cannot have the same bucket name, so add a short `name_suffix` (for example part of the account ID). Names longer than 63 characters are refused.
+- **Turning versioning off** suspends it; S3 keeps existing object versions.
+- **Checking the whole plan.** The [OPA policies](https://github.com/askmohanty/terraform-aws-hardened-modules/tree/main/policies) of this collection verify these settings on any plan, including buckets created outside this module.
 
-| Use this output | As this input |
-|---|---|
-| `kms-key.arn` | `kms_key_arn` here |
-| `arn` | IAM policy `Resource` in `github-oidc-role`, `lambda-function`, `ecs-fargate-service` (`<arn>` and `<arn>/*`) |
-| `bucket_regional_domain_name` | origin in `static-site` |
-| `name` | `access_logging.target_bucket` of another `s3-bucket` (a dedicated log bucket) |
+## Examples
+
+- [s3-bucket-basic](https://github.com/askmohanty/terraform-aws-hardened-modules/tree/main/examples/s3-bucket-basic): a private bucket with the secure defaults and an archive rule
+- [s3-bucket-many](https://github.com/askmohanty/terraform-aws-hardened-modules/tree/main/examples/s3-bucket-many): several buckets from one map, with per-environment values
 
 <!-- BEGIN_TF_DOCS -->
 ## Requirements
@@ -75,19 +144,27 @@ See [examples/s3-bucket-many](https://github.com/askmohanty/terraform-aws-harden
 | Name | Version |
 | ---- | ------- |
 | terraform | >= 1.9 |
-| aws | >= 6.44, < 7.0 |
+| aws | >= 6.0, < 7.0 |
 
 ## Providers
 
 | Name | Version |
 | ---- | ------- |
-| aws | >= 6.44, < 7.0 |
+| aws | >= 6.0, < 7.0 |
 | terraform | n/a |
 
 ## Resources
 
 | Name | Type |
 | ---- | ---- |
+| [aws_s3_bucket.this](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/s3_bucket) | resource |
+| [aws_s3_bucket_lifecycle_configuration.this](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/s3_bucket_lifecycle_configuration) | resource |
+| [aws_s3_bucket_logging.this](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/s3_bucket_logging) | resource |
+| [aws_s3_bucket_ownership_controls.this](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/s3_bucket_ownership_controls) | resource |
+| [aws_s3_bucket_policy.this](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/s3_bucket_policy) | resource |
+| [aws_s3_bucket_public_access_block.this](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/s3_bucket_public_access_block) | resource |
+| [aws_s3_bucket_server_side_encryption_configuration.this](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/s3_bucket_server_side_encryption_configuration) | resource |
+| [aws_s3_bucket_versioning.this](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/s3_bucket_versioning) | resource |
 | [terraform_data.guardrails](https://registry.terraform.io/providers/hashicorp/terraform/latest/docs/resources/data) | resource |
 | [aws_default_tags.current](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/default_tags) | data source |
 | [aws_region.current](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/region) | data source |
@@ -118,3 +195,7 @@ See [examples/s3-bucket-many](https://github.com/askmohanty/terraform-aws-harden
 | region | Region the bucket lives in. |
 | tags | Tags this module sets on the bucket (Name, Region, ManagedBy and your `tags`). The provider adds its default\_tags on top. |
 <!-- END_TF_DOCS -->
+
+## License
+
+Apache-2.0. See [LICENSE](https://github.com/askmohanty/terraform-aws-hardened-modules/blob/main/LICENSE).

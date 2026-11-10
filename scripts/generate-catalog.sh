@@ -6,7 +6,7 @@
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
-repo="askmohanty/terraform-aws-secure"
+repo="askmohanty/terraform-aws-hardened-modules"
 cd "$root"
 mkdir -p catalog
 
@@ -18,8 +18,8 @@ for dir in modules/*/; do
   terraform-docs -c scripts/terraform-docs-json.yml json "$dir" | jq --arg name "$name" --arg summary "$summary" --arg repo "$repo" '{
       name: $name,
       summary: $summary,
-      source: "askmohanty/secure/aws//modules/\($name)",
-      version: "pin the latest release exactly: https://registry.terraform.io/modules/askmohanty/secure/aws",
+      source: "askmohanty/hardened-modules/aws//modules/\($name)",
+      version: "pin the latest release exactly: https://registry.terraform.io/modules/askmohanty/hardened-modules/aws",
       inputs: [.inputs[] | {name, type, required, default, description}],
       outputs: [.outputs[] | {name, description}],
       calls: [.modules[]? | {name, source}]
@@ -31,7 +31,7 @@ jq -s '{repository: "https://github.com/'"$repo"'", tier: 1, modules: .}' "${mod
 rm -f "${modules[@]}"
 
 {
-  echo "# terraform-aws-secure"
+  echo "# terraform-aws-hardened-modules"
   echo
   echo "> Hardened tier-1 Terraform modules for AWS. Compose them into tier-2 stacks; never bypass their guardrails."
   echo

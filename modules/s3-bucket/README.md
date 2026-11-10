@@ -28,7 +28,7 @@ provider "aws" {
 }
 
 module "orders_data" {
-  source  = "askmohanty/secure/aws//modules/s3-bucket"
+  source  = "askmohanty/hardened-modules/aws//modules/s3-bucket"
   version = "0.1.0" # x-release-please-version
 
   name        = "orders-data"   # -> acme-prod-euw1-orders-data-a1b2
@@ -48,7 +48,7 @@ variable "buckets" {
 }
 
 module "bucket" {
-  source  = "askmohanty/secure/aws//modules/s3-bucket"
+  source  = "askmohanty/hardened-modules/aws//modules/s3-bucket"
   version = "0.1.0" # x-release-please-version
   for_each = var.buckets
 
@@ -58,7 +58,7 @@ module "bucket" {
 }
 ```
 
-See [examples/many](examples/many/main.tf).
+See [examples/s3-bucket-many](https://github.com/askmohanty/terraform-aws-hardened-modules/blob/main/examples/s3-bucket-many/main.tf).
 
 ## Composes with
 

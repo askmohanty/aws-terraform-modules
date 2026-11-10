@@ -4,7 +4,7 @@ terraform {
 }
 
 module "name" {
-  source = "../.."
+  source = "../../modules/naming"
 
   org         = "acme"
   environment = "dev"
@@ -14,9 +14,11 @@ module "name" {
 }
 
 output "name" {
-  value = module.name.id # acme-dev-euw1-orders-queue
+  description = "The conventional name for your resource."
+  value       = module.name.id # acme-dev-euw1-orders-queue
 }
 
 output "tags" {
-  value = module.name.tags
+  description = "Standard tags to put on your resource."
+  value       = module.name.tags
 }

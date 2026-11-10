@@ -18,8 +18,9 @@ variable "environment" {
 }
 
 variable "region" {
-  type    = string
-  default = "eu-west-1"
+  description = "AWS region for the stack, plugged in per environment."
+  type        = string
+  default     = "eu-west-1"
 }
 
 variable "buckets" {
@@ -60,7 +61,7 @@ provider "aws" {
 }
 
 module "bucket" {
-  source   = "../.."
+  source   = "../../modules/s3-bucket"
   for_each = var.buckets
 
   name               = each.key
@@ -70,9 +71,11 @@ module "bucket" {
 }
 
 output "bucket_names" {
-  value = { for k, b in module.bucket : k => b.name }
+  description = "Bucket name per map key."
+  value       = { for k, b in module.bucket : k => b.name }
 }
 
 output "bucket_arns" {
-  value = { for k, b in module.bucket : k => b.arn }
+  description = "Bucket ARN per map key."
+  value       = { for k, b in module.bucket : k => b.arn }
 }

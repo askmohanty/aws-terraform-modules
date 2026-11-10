@@ -8,7 +8,11 @@
       "extra-files": [
         "README.md",
         "modules/naming/README.md",
-        "modules/s3-bucket/README.md"
+        "modules/s3-bucket/README.md",
+        "examples/naming-basic/README.md",
+        "examples/naming-many/README.md",
+        "examples/s3-bucket-basic/README.md",
+        "examples/s3-bucket-many/README.md"
       ]
     }
   },

@@ -84,10 +84,12 @@ jobs:
         run: $TF init -backend=false -input=false && $TF validate
       - name: Test (mocked providers, no cloud credentials)
         run: $TF test
-      - name: Validate every example
+      - name: Validate this module's examples
+        env:
+          MODULE: ${{ matrix.module }}
         run: |
           set -euo pipefail
-          for ex in examples/*/; do
+          for ex in "$GITHUB_WORKSPACE"/examples/"$MODULE"-*/; do
             echo "== $ex"
             (cd "$ex" && $TF init -backend=false -input=false >/dev/null && $TF validate)
           done
@@ -125,10 +127,15 @@ jobs:
           curl -sfLo sums "$base/terraform-docs-$TERRAFORM_DOCS_VERSION.sha256sum"
           grep " $a\$" sums | sha256sum -c -
           tar -xzf "$a" terraform-docs && sudo install terraform-docs /usr/local/bin/
-      - name: README inputs and outputs are up to date
+      - name: README inputs and outputs are up to date (module and its examples)
         env:
           MODULE: ${{ matrix.module }}
-        run: terraform-docs -c .terraform-docs.yml --output-check "modules/$MODULE"
+        run: |
+          set -euo pipefail
+          for dir in "modules/$MODULE" examples/"$MODULE"-*/; do
+            test -f "$dir/README.md" || { echo "::error::$dir has no README.md"; exit 1; }
+            terraform-docs -c .terraform-docs.yml --output-check "$dir"
+          done
 
   policy:
     name: Policies (unit tests, module plans, insecure fixture)
@@ -182,7 +189,7 @@ jobs:
         run: |
           set -euo pipefail
           for m in $(jq -r '.[]' <<<"$MODULES"); do
-            for dir in modules/"$m"/examples/*/; do
+            for dir in examples/"$m"-*/; do
               echo "::group::$dir"
               (cd "$dir" && terraform init -backend=false -input=false >/dev/null \
                 && terraform plan -input=false -out tfplan >/dev/null \

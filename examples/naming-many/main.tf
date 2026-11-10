@@ -4,12 +4,13 @@ terraform {
 }
 
 variable "environment" {
-  type    = string
-  default = "dev"
+  description = "Environment, plugged in per environment (dev, test, staging or prod)."
+  type        = string
+  default     = "dev"
 }
 
 module "name" {
-  source   = "../.."
+  source   = "../../modules/naming"
   for_each = toset(["orders-queue", "orders-dlq", "orders-topic"])
 
   org         = "acme"
@@ -19,5 +20,6 @@ module "name" {
 }
 
 output "names" {
-  value = { for k, n in module.name : k => n.id }
+  description = "Conventional name per resource."
+  value       = { for k, n in module.name : k => n.id }
 }

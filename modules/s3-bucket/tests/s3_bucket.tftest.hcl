@@ -1,5 +1,5 @@
-# Offline tests: mocked AWS provider, no credentials. The wrapped module's resource settings are
-# checked by the OPA policies against a real plan in CI (see docs/ARCHITECTURE.md).
+# Offline tests: mocked AWS provider, no credentials. Security settings are asserted on the resources
+# below; CI also plans the examples against an AWS emulator and runs the OPA policies on the plan.
 mock_provider "aws" {
   # A provider configured with region eu-west-1 and the stack's default tags.
   override_data {
@@ -233,4 +233,150 @@ run "refuses_bad_name_suffix" {
   }
 
   expect_failures = [var.name_suffix]
+}
+
+# ---- Security settings on the resources themselves (mocked apply creates nothing real)
+
+run "secure_settings_by_default" {
+  command = apply
+
+  assert {
+    condition = (
+      aws_s3_bucket_public_access_block.this.block_public_acls &&
+      aws_s3_bucket_public_access_block.this.block_public_policy &&
+      aws_s3_bucket_public_access_block.this.ignore_public_acls &&
+      aws_s3_bucket_public_access_block.this.restrict_public_buckets
+    )
+    error_message = "All four public access block settings must be on."
+  }
+
+  assert {
+    condition     = one(aws_s3_bucket_ownership_controls.this.rule).object_ownership == "BucketOwnerEnforced"
+    error_message = "ACLs must be disabled (BucketOwnerEnforced)."
+  }
+
+  assert {
+    condition = (
+      one(aws_s3_bucket_server_side_encryption_configuration.this.rule).apply_server_side_encryption_by_default[0].sse_algorithm == "aws:kms" &&
+      one(aws_s3_bucket_server_side_encryption_configuration.this.rule).bucket_key_enabled
+    )
+    error_message = "Default encryption must be KMS with bucket keys."
+  }
+
+  assert {
+    condition     = aws_s3_bucket_versioning.this.versioning_configuration[0].status == "Enabled"
+    error_message = "Versioning must be on by default."
+  }
+
+  assert {
+    condition = alltrue([
+      for sid in ["DenyInsecureTransport", "DenyOutdatedTLS"] :
+      contains([for s in jsondecode(aws_s3_bucket_policy.this.policy).Statement : s.Sid], sid)
+    ])
+    error_message = "The bucket policy must deny non-TLS requests and TLS older than 1.2."
+  }
+
+  assert {
+    condition = (
+      contains([for r in aws_s3_bucket_lifecycle_configuration.this.rule : r.id], "abort-incomplete-multipart-uploads") &&
+      contains([for r in aws_s3_bucket_lifecycle_configuration.this.rule : r.id], "expire-noncurrent-versions")
+    )
+    error_message = "Default lifecycle rules must be present."
+  }
+
+  assert {
+    condition     = !aws_s3_bucket.this.force_destroy && length(aws_s3_bucket_logging.this) == 0
+    error_message = "force_destroy off and no logging target by default."
+  }
+}
+
+run "customer_key_encrypts_and_denies_other_keys" {
+  command = apply
+
+  variables {
+    kms_key_arn = "arn:aws:kms:eu-west-1:111122223333:key/1234abcd-12ab-34cd-56ef-1234567890ab"
+  }
+
+  assert {
+    condition     = one(aws_s3_bucket_server_side_encryption_configuration.this.rule).apply_server_side_encryption_by_default[0].kms_master_key_id == var.kms_key_arn
+    error_message = "The customer key must be the default encryption key."
+  }
+
+  assert {
+    condition     = contains([for s in jsondecode(aws_s3_bucket_policy.this.policy).Statement : s.Sid], "DenyOtherKmsKeys")
+    error_message = "Uploads naming another key must be denied."
+  }
+}
+
+run "caller_statements_follow_the_required_ones" {
+  command = apply
+
+  variables {
+    policy_json = jsonencode({
+      Version = "2012-10-17"
+      Statement = {
+        Sid       = "ReadForReporting"
+        Effect    = "Allow"
+        Principal = { AWS = "arn:aws:iam::111122223333:role/reporting" }
+        Action    = "s3:GetObject"
+        Resource  = "arn:aws:s3:::acme-dev-euw1-orders-data/*"
+      }
+    })
+  }
+
+  assert {
+    condition     = [for s in jsondecode(aws_s3_bucket_policy.this.policy).Statement : s.Sid] == ["DenyInsecureTransport", "DenyOutdatedTLS", "ReadForReporting"]
+    error_message = "Required deny statements come first, then the caller's (a single statement object is accepted)."
+  }
+}
+
+run "versioning_off_outside_prod" {
+  command = apply
+
+  variables {
+    versioning_enabled = false
+  }
+
+  assert {
+    condition = (
+      aws_s3_bucket_versioning.this.versioning_configuration[0].status == "Suspended" &&
+      !contains([for r in aws_s3_bucket_lifecycle_configuration.this.rule : r.id], "expire-noncurrent-versions")
+    )
+    error_message = "Versioning off suspends it and drops the noncurrent-version rule."
+  }
+}
+
+run "lifecycle_filters_whole_bucket_and_prefix" {
+  command = apply
+
+  variables {
+    lifecycle_rules = [
+      { id = "all", expiration_days = 365 },
+      { id = "exports", prefix = "exports/", transitions = [{ days = 30, storage_class = "STANDARD_IA" }] },
+    ]
+  }
+
+  assert {
+    # An empty filter's prefix is null in Terraform and a mock placeholder in OpenTofu, so assert
+    # only that the whole-bucket rule does not filter on the prefix and the prefix rule does.
+    condition = (
+      length(one([for r in aws_s3_bucket_lifecycle_configuration.this.rule : r if r.id == "all"]).filter) == 1 &&
+      one([for r in aws_s3_bucket_lifecycle_configuration.this.rule : r if r.id == "all"]).filter[0].prefix != "exports/" &&
+      one([for r in aws_s3_bucket_lifecycle_configuration.this.rule : r if r.id == "exports"]).filter[0].prefix == "exports/"
+    )
+    error_message = "A rule without a prefix gets an empty filter; a prefix rule filters on its prefix."
+  }
+}
+
+run "access_logging_when_requested" {
+  command = apply
+
+  variables {
+    access_logging = { target_bucket = "acme-dev-euw1-logs", target_prefix = "s3/" }
+  }
+
+  assert {
+    condition     = length(aws_s3_bucket_logging.this) == 1 && aws_s3_bucket_logging.this[0].target_prefix == "s3/"
+    error_message = "Access logging must be configured when requested."
+  }
 }

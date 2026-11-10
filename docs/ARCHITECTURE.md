@@ -6,18 +6,17 @@ This repository holds **tier-1** Terraform modules for AWS: hardened building bl
 
 | Tier | What it is | Who writes it | Where it lives |
 |---|---|---|---|
-| **Tier 1** | One building block per module (`s3-bucket`, `vpc`, `rds-postgres`, ...): an opinionated, hardened wrapper | This repository | `modules/<name>` |
+| **Tier 1** | One building block per module (`s3-bucket`, `vpc`, `rds-postgres`, ...): an opinionated, hardened module | This repository | `modules/<name>` |
 | **Tier 2** | A stack for one workload or environment, composed **only** of tier-1 modules (e.g. a web service: `vpc` + `ecs-fargate-service` + `rds-postgres` + `s3-bucket`) | Teams or AI agents | Their own repo, from the tier-2 template |
 
 Tier 2 never declares raw `aws_*` resources for something a tier-1 module covers. If a building block is missing, it is added to tier 1 first.
 
 ## How a tier-1 module is built
 
-1. **Wrap proven open-source code.** Where a well-maintained community module exists (terraform-aws-modules, Apache-2.0), the tier-1 module calls it, pinned to an exact commit SHA. Upstream updates arrive as Renovate PRs and must pass all checks again.
-2. **Change its behaviour.** The wrapper exposes a small, opinionated set of inputs, hard-codes the secure settings (callers cannot turn them off), and passes the rest of upstream's options through only when there is a safe reason to.
+1. **Own code, no module dependencies.** Each module declares its `aws_*` resources directly; the only module call is the internal naming helper. We study how established modules solve the same problem (ordering, edge cases) and write our own implementation, so the Registry lists only the AWS provider as a dependency and every line is ours to audit.
+2. **Opinionated, hardened inputs.** A module exposes a small set of inputs and hard-codes the secure settings (callers cannot turn them off). Tests assert those settings on the resources themselves.
 3. **Inject naming and tags from the provider.** A stack sets `Org`, `Environment` (and optionally `Owner`, `CostCentre`) once in the AWS provider's `default_tags`. Every module reads them and the provider's region (`aws_default_tags`, `aws_region`), calls `internal/naming`, and needs only a `name`. Resources are named `{org}-{environment}-{region_short}-{name}` (e.g. `acme-prod-euw1-orders-db`); the provider applies the stack tags and the module adds `Name`, `Region` and `ManagedBy`. A provider without `Org` and `Environment` stops the plan.
 4. **Guardrails inside the module.** Variable `validation` blocks and `precondition`s on a `terraform_data "guardrails"` resource stop an insecure configuration at plan time; there is no input that disables them.
-5. Where no suitable upstream module exists, the module is written directly to the same standard.
 
 ## Policy as code (OPA)
 

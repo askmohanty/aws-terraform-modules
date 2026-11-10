@@ -28,28 +28,6 @@ locals {
     { for k, v in var.tags : k => v if !contains(keys(local.stack_tags), k) },
     { Name = local.bucket_name, Region = data.aws_region.current.region, ManagedBy = "terraform" },
   )
-
-  lifecycle_rules = concat(
-    [{
-      id                                     = "abort-incomplete-multipart-uploads"
-      enabled                                = true
-      filter                                 = { prefix = "" }
-      abort_incomplete_multipart_upload_days = 7
-    }],
-    var.versioning_enabled && var.noncurrent_version_expiration_days != null ? [{
-      id                            = "expire-noncurrent-versions"
-      enabled                       = true
-      filter                        = { prefix = "" }
-      noncurrent_version_expiration = { days = var.noncurrent_version_expiration_days }
-    }] : [],
-    [for r in var.lifecycle_rules : {
-      id         = r.id
-      enabled    = true
-      filter     = { prefix = r.prefix }
-      expiration = r.expiration_days == null ? null : { days = r.expiration_days }
-      transition = [for t in r.transitions : { days = t.days, storage_class = t.storage_class }]
-    }],
-  )
 }
 
 # Guardrails that depend on more than one input. A failed precondition stops the plan.
@@ -74,51 +52,172 @@ resource "terraform_data" "guardrails" {
   }
 }
 
-module "bucket" {
-  # terraform-aws-modules/s3-bucket v5.17.0, pinned to a commit
-  source = "git::https://github.com/terraform-aws-modules/terraform-aws-s3-bucket.git?ref=9afa4fc8c8f1e0b3fd913474c1bef8d0c454b235"
-
+resource "aws_s3_bucket" "this" {
   bucket        = local.bucket_name
   force_destroy = var.force_destroy
   tags          = local.resource_tags
 
-  # No ACLs: the bucket owner owns every object; access is by policy only.
-  control_object_ownership = true
-  object_ownership         = "BucketOwnerEnforced"
+  depends_on = [terraform_data.guardrails]
+}
 
-  # No public access, ever.
+# No ACLs: the bucket owner owns every object and access is controlled by policy only.
+resource "aws_s3_bucket_ownership_controls" "this" {
+  bucket = aws_s3_bucket.this.id
+
+  rule {
+    object_ownership = "BucketOwnerEnforced"
+  }
+}
+
+# No public access, ever.
+resource "aws_s3_bucket_public_access_block" "this" {
+  bucket = aws_s3_bucket.this.id
+
   block_public_acls       = true
   block_public_policy     = true
   ignore_public_acls      = true
   restrict_public_buckets = true
+}
 
-  versioning = { enabled = tostring(var.versioning_enabled) }
+resource "aws_s3_bucket_versioning" "this" {
+  bucket = aws_s3_bucket.this.id
 
-  # KMS encryption is always on.
-  server_side_encryption_configuration = {
-    rule = {
-      bucket_key_enabled = true
-      apply_server_side_encryption_by_default = {
-        sse_algorithm     = "aws:kms"
-        kms_master_key_id = var.kms_key_arn
+  versioning_configuration {
+    status = var.versioning_enabled ? "Enabled" : "Suspended"
+  }
+}
+
+# KMS encryption is always on: the aws/s3 key, or the customer key in kms_key_arn.
+resource "aws_s3_bucket_server_side_encryption_configuration" "this" {
+  bucket = aws_s3_bucket.this.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm     = "aws:kms"
+      kms_master_key_id = var.kms_key_arn
+    }
+    bucket_key_enabled = true
+  }
+}
+
+resource "aws_s3_bucket_lifecycle_configuration" "this" {
+  bucket = aws_s3_bucket.this.id
+
+  # Whole-bucket rules use an empty filter.
+  rule {
+    id     = "abort-incomplete-multipart-uploads"
+    status = "Enabled"
+    filter {}
+
+    abort_incomplete_multipart_upload {
+      days_after_initiation = 7
+    }
+  }
+
+  dynamic "rule" {
+    for_each = var.versioning_enabled && var.noncurrent_version_expiration_days != null ? [var.noncurrent_version_expiration_days] : []
+    content {
+      id     = "expire-noncurrent-versions"
+      status = "Enabled"
+      filter {}
+
+      noncurrent_version_expiration {
+        noncurrent_days = rule.value
       }
     }
   }
 
-  # Policy: deny non-TLS and TLS < 1.2; with a customer key, deny uploads that name another key.
-  attach_deny_insecure_transport_policy = true
-  attach_require_latest_tls_policy      = true
-  attach_deny_incorrect_kms_key_sse     = var.kms_key_arn != null
-  allowed_kms_key_arn                   = var.kms_key_arn
-  attach_policy                         = var.policy_json != null
-  policy                                = var.policy_json
+  dynamic "rule" {
+    for_each = var.lifecycle_rules
+    content {
+      id     = rule.value.id
+      status = "Enabled"
 
-  lifecycle_rule = local.lifecycle_rules
+      # Empty filter for the whole bucket, a prefix filter otherwise.
+      dynamic "filter" {
+        for_each = rule.value.prefix == "" ? [true] : []
+        content {}
+      }
+      dynamic "filter" {
+        for_each = rule.value.prefix == "" ? [] : [rule.value.prefix]
+        content {
+          prefix = filter.value
+        }
+      }
 
-  logging = var.access_logging == null ? null : {
-    target_bucket = var.access_logging.target_bucket
-    target_prefix = var.access_logging.target_prefix
+      dynamic "expiration" {
+        for_each = rule.value.expiration_days == null ? [] : [rule.value.expiration_days]
+        content {
+          days = expiration.value
+        }
+      }
+
+      dynamic "transition" {
+        for_each = rule.value.transitions
+        content {
+          days          = transition.value.days
+          storage_class = transition.value.storage_class
+        }
+      }
+    }
   }
 
-  depends_on = [terraform_data.guardrails]
+  # Rules on object versions need versioning configured first.
+  depends_on = [aws_s3_bucket_versioning.this]
+}
+
+resource "aws_s3_bucket_logging" "this" {
+  count = var.access_logging == null ? 0 : 1
+
+  bucket        = aws_s3_bucket.this.id
+  target_bucket = var.access_logging.target_bucket
+  target_prefix = var.access_logging.target_prefix
+}
+
+locals {
+  bucket_resources = [aws_s3_bucket.this.arn, "${aws_s3_bucket.this.arn}/*"]
+
+  required_statements = concat(
+    [
+      {
+        Sid       = "DenyInsecureTransport"
+        Effect    = "Deny"
+        Principal = "*"
+        Action    = "s3:*"
+        Resource  = local.bucket_resources
+        Condition = { Bool = { "aws:SecureTransport" = "false" } }
+      },
+      {
+        Sid       = "DenyOutdatedTLS"
+        Effect    = "Deny"
+        Principal = "*"
+        Action    = "s3:*"
+        Resource  = local.bucket_resources
+        Condition = { NumericLessThan = { "s3:TlsVersion" = "1.2" } }
+      },
+    ],
+    # With a customer key, uploads that name a different key are denied.
+    var.kms_key_arn == null ? [] : [{
+      Sid       = "DenyOtherKmsKeys"
+      Effect    = "Deny"
+      Principal = "*"
+      Action    = "s3:PutObject"
+      Resource  = "${aws_s3_bucket.this.arn}/*"
+      Condition = { StringNotEqualsIfExists = { "s3:x-amz-server-side-encryption-aws-kms-key-id" = var.kms_key_arn } }
+    }],
+  )
+
+  # The caller's statements (a single object or a list) come after the required ones.
+  caller_statements = var.policy_json == null ? [] : flatten([jsondecode(var.policy_json).Statement])
+}
+
+resource "aws_s3_bucket_policy" "this" {
+  bucket = aws_s3_bucket.this.id
+  policy = jsonencode({
+    Version   = "2012-10-17"
+    Statement = concat(local.required_statements, local.caller_statements)
+  })
+
+  # The public access block must exist first, or AWS rejects the policy with a conflicting operation.
+  depends_on = [aws_s3_bucket_public_access_block.this]
 }

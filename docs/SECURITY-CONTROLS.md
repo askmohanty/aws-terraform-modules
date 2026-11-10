@@ -15,7 +15,7 @@ Every control names where it lives, so it can be checked. Review this file whene
 |---|---|---|
 | A01 Broken Access Control | No public buckets or public policies; least-privilege IAM, no `*:*`; module inputs refuse `Principal: "*"` | module `validation`, `policies/aws/s3.rego`, `policies/aws/iam_kms.rego` |
 | A02 Security Misconfiguration | Secure defaults that callers cannot turn off; prod-only guardrails (deletion protection, versioning); whole-plan policy check | module wrappers, `terraform_data.guardrails`, `policies/` |
-| A03 Software Supply Chain Failures | Upstream modules pinned to commit SHAs; every Action pinned to a SHA; tools checksum-verified; Renovate updates re-checked by CI; OpenSSF Scorecard | `modules/*/main.tf`, `.github/workflows/`, `renovate.json` |
+| A03 Software Supply Chain Failures | No third-party module dependencies (only the AWS provider); every Action pinned to a SHA; tools checksum-verified; Renovate updates re-checked by CI; OpenSSF Scorecard | `modules/*/main.tf`, `.github/workflows/`, `renovate.json` |
 | A04 Cryptographic Failures | Encryption at rest always on (KMS); TLS 1.2+ required in transit; KMS key rotation | modules, `policies/aws/s3.rego`, `policies/aws/data_stores.rego`, `policies/aws/iam_kms.rego` |
 | A05 Injection | Workflow inputs passed through `env:`, never interpolated into scripts; no provisioners or `external` data sources; workflow static analysis | `.github/workflows/`, `policies/common/execution.rego`, zizmor |
 | A06 Insecure Design | Tier model (tier 2 only composes tier 1); policy-as-code over the whole plan; reviewed, expiring exceptions | `docs/ARCHITECTURE.md`, `policies/data/exceptions.yaml` |
@@ -30,7 +30,7 @@ Every control names where it lives, so it can be checked. Review this file whene
 |---|---|
 | CICD-SEC-1 Insufficient Flow Control | `main` ruleset: pull requests only, `CI result` must pass, signed commits, no force-push or deletion; prod deploys need a reviewer (GitHub Environments) |
 | CICD-SEC-2 Inadequate Identity and Access Management | Single maintainer with 2FA; `CODEOWNERS`; agents act only through pull requests and never hold credentials |
-| CICD-SEC-3 Dependency Chain Abuse | Commit-SHA pins for upstream modules and Actions; checksum-verified tool downloads; no `curl \| sh` |
+| CICD-SEC-3 Dependency Chain Abuse | No third-party module dependencies; Actions pinned to commit SHAs; checksum-verified tool downloads; no `curl \| sh` |
 | CICD-SEC-4 Poisoned Pipeline Execution | No `pull_request_target`; workflows from forks need approval; untrusted values reach scripts only through `env:`; zizmor checks workflows |
 | CICD-SEC-5 Insufficient PBAC | Default workflow token is read-only; each job asks for the permissions it needs; plan and apply use different cloud roles |
 | CICD-SEC-6 Insufficient Credential Hygiene | No stored cloud secrets (OIDC); `persist-credentials: false` on checkout; secret scanning with push protection |

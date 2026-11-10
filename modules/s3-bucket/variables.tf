@@ -1,18 +1,5 @@
-variable "context" {
-  description = "Naming and tagging context shared by every module in a stack. See `modules/naming`."
-  type = object({
-    org                  = string
-    environment          = string
-    region               = string
-    owner                = optional(string)
-    cost_centre          = optional(string)
-    extra_tags           = optional(map(string), {})
-    allowed_environments = optional(list(string), ["dev", "test", "staging", "prod"])
-  })
-}
-
 variable "name" {
-  description = "What the bucket is for (e.g. `orders-data`). The bucket is named `{org}-{environment}-{region_short}-{name}[-{name_suffix}]`."
+  description = "What the bucket is for (e.g. `orders-data`). The bucket is named `{Org}-{Environment}-{region_short}-{name}[-{name_suffix}]`, with `Org` and `Environment` read from the AWS provider's `default_tags` and the region from the provider."
   type        = string
 }
 
@@ -117,7 +104,7 @@ variable "policy_json" {
 }
 
 variable "tags" {
-  description = "Extra tags. The standard naming tags always win."
+  description = "Tags for this bucket only. Stack-wide tags (`Org`, `Environment`, `Owner`, ...) belong in the provider's `default_tags`; `Name`, `Region` and `ManagedBy` are set by the module."
   type        = map(string)
   default     = {}
 }

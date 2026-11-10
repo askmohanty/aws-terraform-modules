@@ -36,6 +36,10 @@ Defaults must be the safe choice; anything less safe is an explicit opt-in with 
 - Stateful resources get `deletion_protection` (or equivalent) on by default.
 - Every resource that accepts tags gets `var.tags`.
 
+## Naming from the provider
+
+Every module takes a `name` and reads the stack's facts from the provider: `data "aws_default_tags"` for `Org` and `Environment`, `data "aws_region"` for the region. It calls `modules/naming` for the resource name, sets only `Name`, `Region` and `ManagedBy` (plus caller `tags`, minus any stack tag keys) on resources, and refuses the plan when `Org` or `Environment` is missing. Tests pin both data sources with `override_data`.
+
 ## Inputs and outputs
 
 - `snake_case` names, a `description` on every variable and output, and a precise `type` (no bare `any` unless the shape genuinely varies).

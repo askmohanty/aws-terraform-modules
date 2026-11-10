@@ -102,13 +102,6 @@
           "description": "Write server access logs to another bucket. Null turns access logging off."
         },
         {
-          "name": "context",
-          "type": "object({\n    org                  = string\n    environment          = string\n    region               = string\n    owner                = optional(string)\n    cost_centre          = optional(string)\n    extra_tags           = optional(map(string), {})\n    allowed_environments = optional(list(string), [\"dev\", \"test\", \"staging\", \"prod\"])\n  })",
-          "required": true,
-          "default": null,
-          "description": "Naming and tagging context shared by every module in a stack. See `modules/naming`."
-        },
-        {
           "name": "force_destroy",
           "type": "bool",
           "required": false,
@@ -134,7 +127,7 @@
           "type": "string",
           "required": true,
           "default": null,
-          "description": "What the bucket is for (e.g. `orders-data`). The bucket is named `{org}-{environment}-{region_short}-{name}[-{name_suffix}]`."
+          "description": "What the bucket is for (e.g. `orders-data`). The bucket is named `{Org}-{Environment}-{region_short}-{name}[-{name_suffix}]`, with `Org` and `Environment` read from the AWS provider's `default_tags` and the region from the provider."
         },
         {
           "name": "name_suffix",
@@ -162,7 +155,7 @@
           "type": "map(string)",
           "required": false,
           "default": {},
-          "description": "Extra tags. The standard naming tags always win."
+          "description": "Tags for this bucket only. Stack-wide tags (`Org`, `Environment`, `Owner`, ...) belong in the provider's `default_tags`; `Name`, `Region` and `ManagedBy` are set by the module."
         },
         {
           "name": "versioning_enabled",
@@ -195,7 +188,7 @@
         },
         {
           "name": "tags",
-          "description": "Tags applied to the bucket."
+          "description": "Tags this module sets on the bucket (Name, Region, ManagedBy and your `tags`). The provider adds its default_tags on top."
         }
       ],
       "calls": [

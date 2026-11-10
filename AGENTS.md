@@ -11,18 +11,20 @@ You are writing or changing a **tier-2** Terraform stack: infrastructure for one
 ## Rules for tier-2 code
 
 1. **Use only tier-1 modules** from this repository, referenced by the `source` string in the catalog: pinned to a release tag (`?ref=<module>/vX.Y.Z`) or a commit SHA. Never `?ref=main`, never a registry module directly, never a raw `aws_*` resource for something a tier-1 module covers. If a building block is missing, stop and ask for a tier-1 module.
-2. **One `context` per stack**, passed unchanged to every module:
+2. **Set the stack's facts once, on the provider.** Modules read the region and `default_tags` from it; never repeat them per module:
    ```hcl
-   locals {
-     context = {
-       org         = "acme"
-       environment = "dev"          # dev, test, staging or prod
-       region      = "eu-west-1"
-       owner       = "orders-team"
+   provider "aws" {
+     region = "eu-west-1"
+     default_tags {
+       tags = {
+         Org         = "acme"
+         Environment = "dev"          # dev, test, staging or prod
+         Owner       = "orders-team"
+       }
      }
    }
    ```
-   Give each module a short `name` describing its purpose (`orders-data`, `api`); the naming convention does the rest.
+   Give each module a short `name` describing its purpose (`orders-data`, `api`); the naming convention does the rest. Do not put `Org`, `Environment` or `Owner` in a module's `tags`.
 3. **Wire modules through outputs**, as listed under *Composes with*. Never hard-code ARNs, IDs or names that another module outputs.
 4. **Never weaken a guardrail.** Do not look for inputs that disable encryption, logging or deletion protection, and do not add `force_destroy`, public access or wildcard IAM to make an error go away. If a guardrail blocks you, explain why in the pull request and stop.
 5. **No arbitrary code execution**: no `provisioner` blocks, no `data "external"`, no `null_resource` with scripts. The policies deny them.

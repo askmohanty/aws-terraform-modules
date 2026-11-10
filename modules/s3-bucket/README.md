@@ -20,17 +20,17 @@ Callers cannot turn these off:
 ## Usage
 
 ```hcl
+provider "aws" {
+  region = "eu-west-1"
+  default_tags {
+    tags = { Org = "acme", Environment = "prod", Owner = "orders-team" }
+  }
+}
+
 module "orders_data" {
   source = "git::https://github.com/askmohanty/aws-terraform-modules.git//modules/s3-bucket?ref=s3-bucket/v0.1.0" # x-release-please-version
 
-  context = {
-    org         = "acme"
-    environment = "prod"
-    region      = "eu-west-1"
-    owner       = "orders-team"
-  }
-
-  name        = "orders-data"   # -> acme-prod-euw1-orders-data-<suffix>
+  name        = "orders-data"   # -> acme-prod-euw1-orders-data-a1b2
   name_suffix = "a1b2"          # bucket names are global; add a suffix to avoid collisions
   kms_key_arn = module.orders_key.arn
 }
@@ -57,6 +57,7 @@ module "orders_data" {
 
 | Name | Version |
 | ---- | ------- |
+| aws | >= 6.44, < 7.0 |
 | terraform | n/a |
 
 ## Modules
@@ -71,13 +72,14 @@ module "orders_data" {
 | Name | Type |
 | ---- | ---- |
 | [terraform_data.guardrails](https://registry.terraform.io/providers/hashicorp/terraform/latest/docs/resources/data) | resource |
+| [aws_default_tags.current](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/default_tags) | data source |
+| [aws_region.current](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/region) | data source |
 
 ## Inputs
 
 | Name | Description | Type | Default | Required |
 | ---- | ----------- | ---- | ------- | :------: |
-| context | Naming and tagging context shared by every module in a stack. See `modules/naming`. | <pre>object({<br/>    org                  = string<br/>    environment          = string<br/>    region               = string<br/>    owner                = optional(string)<br/>    cost_centre          = optional(string)<br/>    extra_tags           = optional(map(string), {})<br/>    allowed_environments = optional(list(string), ["dev", "test", "staging", "prod"])<br/>  })</pre> | n/a | yes |
-| name | What the bucket is for (e.g. `orders-data`). The bucket is named `{org}-{environment}-{region_short}-{name}[-{name_suffix}]`. | `string` | n/a | yes |
+| name | What the bucket is for (e.g. `orders-data`). The bucket is named `{Org}-{Environment}-{region_short}-{name}[-{name_suffix}]`, with `Org` and `Environment` read from the AWS provider's `default_tags` and the region from the provider. | `string` | n/a | yes |
 | access\_logging | Write server access logs to another bucket. Null turns access logging off. | <pre>object({<br/>    target_bucket = string<br/>    target_prefix = optional(string, "")<br/>  })</pre> | `null` | no |
 | force\_destroy | Allow `terraform destroy` to delete a bucket that still contains objects. Refused in `prod`. | `bool` | `false` | no |
 | kms\_key\_arn | Customer-managed KMS key for default encryption. When set, uploads that request a different key are denied. When null, the AWS-managed `aws/s3` key is used. | `string` | `null` | no |
@@ -85,7 +87,7 @@ module "orders_data" {
 | name\_suffix | Optional suffix appended to the bucket name, for global uniqueness (bucket names are unique across all AWS accounts). For example a short account ID or random string. | `string` | `null` | no |
 | noncurrent\_version\_expiration\_days | Delete previous object versions this many days after they stop being current. Null keeps them forever. | `number` | `90` | no |
 | policy\_json | Extra bucket policy (JSON from `jsonencode` or `aws_iam_policy_document`), merged with the built-in deny statements (TLS, KMS key). Statements that allow access to everyone (`Principal: "*"`) are refused. | `string` | `null` | no |
-| tags | Extra tags. The standard naming tags always win. | `map(string)` | `{}` | no |
+| tags | Tags for this bucket only. Stack-wide tags (`Org`, `Environment`, `Owner`, ...) belong in the provider's `default_tags`; `Name`, `Region` and `ManagedBy` are set by the module. | `map(string)` | `{}` | no |
 | versioning\_enabled | Keep previous versions of overwritten and deleted objects. Refused as false in `prod`. | `bool` | `true` | no |
 
 ## Outputs
@@ -97,5 +99,5 @@ module "orders_data" {
 | id | Bucket name as created. |
 | name | Bucket name, built by the naming convention. Known at plan time. |
 | region | Region the bucket lives in. |
-| tags | Tags applied to the bucket. |
+| tags | Tags this module sets on the bucket (Name, Region, ManagedBy and your `tags`). The provider adds its default\_tags on top. |
 <!-- END_TF_DOCS -->

@@ -165,6 +165,14 @@ test_org_config_extends_environments if {
 		with data.naming.environments as ["dev", "qa", "prod"]
 }
 
+test_tags_from_provider_default_tags_count if {
+	resource := rc("aws_sqs_queue", "aws_sqs_queue.q", "", {
+		"tags": {"Name": "acme-dev-euw1-orders", "ManagedBy": "terraform"},
+		"tags_all": good_tags,
+	})
+	count(tagging.deny) == 0 with input as {"resource_changes": [resource]}
+}
+
 test_untaggable_resource_ignored if {
 	count(tagging.deny) == 0 with input as {"resource_changes": [pab("module.b", true)]}
 }

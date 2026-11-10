@@ -1,22 +1,41 @@
 # Offline tests: mocked AWS provider, no credentials. The wrapped module's resource settings are
 # checked by the OPA policies against a real plan in CI (see docs/ARCHITECTURE.md).
-mock_provider "aws" {}
+mock_provider "aws" {
+  # A provider configured with region eu-west-1 and the stack's default tags.
+  override_data {
+    target = data.aws_region.current
+    values = { region = "eu-west-1" }
+  }
+  override_data {
+    target = data.aws_default_tags.current
+    values = { tags = { Org = "acme", Environment = "dev", Owner = "orders-team" } }
+  }
+}
 
 variables {
-  context = {
-    org         = "acme"
-    environment = "dev"
-    region      = "eu-west-1"
-  }
   name = "orders-data"
 }
 
-run "names_the_bucket_by_convention" {
+run "names_the_bucket_from_provider_tags_and_region" {
   command = plan
 
   assert {
     condition     = output.name == "acme-dev-euw1-orders-data"
-    error_message = "Bucket name must be {org}-{env}-{region_short}-{name}."
+    error_message = "Bucket name must be {Org}-{Environment}-{region_short}-{name}."
+  }
+}
+
+run "follows_the_provider_region" {
+  command = plan
+
+  override_data {
+    target = data.aws_region.current
+    values = { region = "ap-southeast-2" }
+  }
+
+  assert {
+    condition     = output.name == "acme-dev-apse2-orders-data"
+    error_message = "The region in the name must come from the provider."
   }
 }
 
@@ -33,17 +52,50 @@ run "appends_name_suffix" {
   }
 }
 
-run "applies_standard_tags" {
+run "sets_name_region_managedby_and_keeps_caller_tags" {
   command = plan
 
   variables {
-    tags = { Project = "orders", ManagedBy = "someone-else" }
+    tags = { DataClass = "confidential" }
   }
 
   assert {
-    condition     = output.tags.ManagedBy == "terraform" && output.tags.Environment == "dev" && output.tags.Project == "orders"
-    error_message = "Standard tags must be applied and win over caller tags; caller tags must be kept."
+    condition = (
+      output.tags.Name == "acme-dev-euw1-orders-data" &&
+      output.tags.Region == "eu-west-1" &&
+      output.tags.ManagedBy == "terraform" &&
+      output.tags.DataClass == "confidential"
+    )
+    error_message = "The module must set Name, Region and ManagedBy and keep caller tags."
   }
+}
+
+run "callers_cannot_override_stack_tags" {
+  command = plan
+
+  variables {
+    tags = { Environment = "prod", Owner = "someone-else", ManagedBy = "hand" }
+  }
+
+  assert {
+    condition = (
+      !contains(keys(output.tags), "Environment") &&
+      !contains(keys(output.tags), "Owner") &&
+      output.tags.ManagedBy == "terraform"
+    )
+    error_message = "Stack tags come only from the provider's default_tags; ManagedBy is always terraform."
+  }
+}
+
+run "refuses_provider_without_org_and_environment" {
+  command = plan
+
+  override_data {
+    target = data.aws_default_tags.current
+    values = { tags = { Owner = "orders-team" } }
+  }
+
+  expect_failures = [terraform_data.guardrails]
 }
 
 run "allows_force_destroy_outside_prod" {
@@ -57,8 +109,12 @@ run "allows_force_destroy_outside_prod" {
 run "refuses_force_destroy_in_prod" {
   command = plan
 
+  override_data {
+    target = data.aws_default_tags.current
+    values = { tags = { Org = "acme", Environment = "prod" } }
+  }
+
   variables {
-    context       = { org = "acme", environment = "prod", region = "eu-west-1" }
     force_destroy = true
   }
 
@@ -68,8 +124,12 @@ run "refuses_force_destroy_in_prod" {
 run "refuses_versioning_off_in_prod" {
   command = plan
 
+  override_data {
+    target = data.aws_default_tags.current
+    values = { tags = { Org = "acme", Environment = "prod" } }
+  }
+
   variables {
-    context            = { org = "acme", environment = "prod", region = "eu-west-1" }
     versioning_enabled = false
   }
 

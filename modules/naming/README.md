@@ -4,7 +4,7 @@ Builds resource names (`{org}-{environment}-{region_short}-{name}`) and the stan
 
 ## What it creates
 
-Nothing: it computes values. Every other module calls it internally from its `context` input, so tier-2 code rarely calls it directly. Use it directly only for resources that no tier-1 module covers yet, so they follow the same convention.
+Nothing: it computes values. Every other module calls it internally with `Org` and `Environment` from the AWS provider's `default_tags` and the provider's region, so tier-2 code rarely calls it directly. Use it directly only for resources that no tier-1 module covers yet, so they follow the same convention.
 
 ## Security guarantees
 

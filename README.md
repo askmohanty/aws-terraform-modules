@@ -4,7 +4,7 @@ Hardened, tested Terraform modules for AWS that companies can use as their tier-
 
 - **Secure by default, not by option.** Encryption, private access, TLS and logging are on and cannot be turned off from the module inputs.
 - **Built on proven open source.** Where a well-maintained [terraform-aws-modules](https://github.com/terraform-aws-modules) module exists, these modules wrap it at a pinned commit and change its behaviour: fewer inputs, hardened defaults, guardrails.
-- **One naming convention everywhere.** `{org}-{environment}-{region}-{name}` with a standard tag set, injected by every module.
+- **One naming convention everywhere.** `{org}-{environment}-{region}-{name}`, built by every module from the provider's `default_tags` and region, so a module call needs only a `name`.
 - **Policy as code.** OPA rules check the whole Terraform plan, whoever wrote it, with reviewed and expiring exceptions.
 - **Written for agents too.** [AGENTS.md](AGENTS.md), [llms.txt](llms.txt) and [catalog/modules.json](catalog/modules.json) let an AI agent compose correct tier-2 stacks.
 
@@ -19,14 +19,19 @@ More modules are being added; see [catalog/modules.json](catalog/modules.json) f
 
 ## Using a module
 
-Pin every module to a release tag:
+Set the stack's `Org` and `Environment` once in the provider's `default_tags`; every module reads them and the provider's region to build names. Pin every module to a release tag:
 
 ```hcl
+provider "aws" {
+  region = "eu-west-1"
+  default_tags {
+    tags = { Org = "acme", Environment = "prod", Owner = "orders-team" }
+  }
+}
+
 module "orders_data" {
   source = "git::https://github.com/askmohanty/aws-terraform-modules.git//modules/s3-bucket?ref=s3-bucket/v0.1.0"
-
-  context = { org = "acme", environment = "prod", region = "eu-west-1" }
-  name    = "orders-data"
+  name   = "orders-data" # -> acme-prod-euw1-orders-data
 }
 ```
 

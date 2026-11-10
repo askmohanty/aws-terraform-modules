@@ -1,19 +1,33 @@
+# Stack-wide facts come from the provider: its region and its default_tags (Org, Environment, ...).
+data "aws_region" "current" {}
+
+data "aws_default_tags" "current" {}
+
+locals {
+  stack_tags = data.aws_default_tags.current.tags
+  # When Org or Environment is missing, terraform_data.guardrails stops the plan with an exact fix.
+  # The placeholders only keep the naming module from failing first with a less helpful message.
+  stack_ok = contains(keys(local.stack_tags), "Org") && contains(keys(local.stack_tags), "Environment")
+}
+
 module "naming" {
   source = "../naming"
 
-  org                  = var.context.org
-  environment          = var.context.environment
-  allowed_environments = var.context.allowed_environments
-  region               = var.context.region
-  name                 = var.name
-  owner                = var.context.owner
-  cost_centre          = var.context.cost_centre
-  extra_tags           = merge(var.context.extra_tags, var.tags)
+  org         = local.stack_ok ? local.stack_tags["Org"] : "unset"
+  environment = local.stack_ok ? local.stack_tags["Environment"] : "dev"
+  region      = data.aws_region.current.region
+  name        = var.name
 }
 
 locals {
   bucket_name = var.name_suffix == null ? module.naming.id : "${module.naming.id}-${var.name_suffix}"
-  is_prod     = var.context.environment == "prod"
+  is_prod     = lookup(local.stack_tags, "Environment", "") == "prod"
+
+  # Org, Environment, Owner, ... are applied by the provider's default_tags; never override them here.
+  resource_tags = merge(
+    { for k, v in var.tags : k => v if !contains(keys(local.stack_tags), k) },
+    { Name = local.bucket_name, Region = data.aws_region.current.region, ManagedBy = "terraform" },
+  )
 
   lifecycle_rules = concat(
     [{
@@ -42,6 +56,10 @@ locals {
 resource "terraform_data" "guardrails" {
   lifecycle {
     precondition {
+      condition     = local.stack_ok
+      error_message = "Set the stack's Org and Environment once on the AWS provider: provider \"aws\" { default_tags { tags = { Org = \"acme\", Environment = \"dev\" } } }."
+    }
+    precondition {
       condition     = length(local.bucket_name) <= 63
       error_message = "Bucket name \"${local.bucket_name}\" is longer than 63 characters. Shorten `name` or `name_suffix`."
     }
@@ -62,7 +80,7 @@ module "bucket" {
 
   bucket        = local.bucket_name
   force_destroy = var.force_destroy
-  tags          = module.naming.tags
+  tags          = local.resource_tags
 
   # No ACLs: the bucket owner owns every object; access is by policy only.
   control_object_ownership = true

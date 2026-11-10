@@ -9,22 +9,24 @@ terraform {
   }
 }
 
+# Stack-wide facts are set once, on the provider. Every module reads them.
 provider "aws" {
   region = "eu-west-1"
+
+  default_tags {
+    tags = {
+      Org         = "acme"
+      Environment = "dev"
+      Owner       = "orders-team"
+    }
+  }
 }
 
 module "orders_data" {
   source = "../.."
 
-  context = {
-    org         = "acme"
-    environment = "dev"
-    region      = "eu-west-1"
-    owner       = "orders-team"
-  }
-
-  name        = "orders-data"
-  name_suffix = "ex1" # bucket names are global; a suffix avoids collisions
+  name        = "orders-data" # -> acme-dev-euw1-orders-data-ex1
+  name_suffix = "ex1"         # bucket names are global; a suffix avoids collisions
 
   lifecycle_rules = [{
     id          = "archive-exports"

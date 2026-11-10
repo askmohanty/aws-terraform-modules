@@ -24,6 +24,6 @@ output "region" {
 }
 
 output "tags" {
-  description = "Tags applied to the bucket."
-  value       = module.naming.tags
+  description = "Tags this module sets on the bucket (Name, Region, ManagedBy and your `tags`). The provider adds its default_tags on top."
+  value       = local.resource_tags
 }

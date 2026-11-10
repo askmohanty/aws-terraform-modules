@@ -6,13 +6,18 @@ import rego.v1
 
 name_pattern := sprintf("^%s-(%s)-[a-z0-9]+-[a-z0-9-]+$", [plan.org_pattern, concat("|", plan.environments)])
 
-# A resource is taggable when its planned attributes include a `tags` key.
+# A resource is taggable when its planned attributes include `tags` or `tags_all`.
 taggable contains rc if {
 	some rc in plan.changes
-	"tags" in object.keys(plan.after(rc))
+	some key in {"tags", "tags_all"}
+	key in object.keys(plan.after(rc))
 }
 
+# `tags_all` is the provider's merged view: the resource's tags plus the provider's default_tags.
 tags_of(rc) := t if {
+	t := plan.after(rc).tags_all
+	t != null
+} else := t if {
 	t := plan.after(rc).tags
 	t != null
 } else := {}

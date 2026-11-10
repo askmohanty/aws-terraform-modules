@@ -1,0 +1,10 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "github>askmohanty/renovate-config",
+    "github>askmohanty/renovate-config:automerge"
+  ],
+  "terraform": {
+    "rangeStrategy": "widen"
+  }
+}

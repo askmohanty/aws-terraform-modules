@@ -1,0 +1,66 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  release-please:
+    name: Open or update the release PR, tag merged releases
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    outputs:
+      releases_created: ${{ steps.rp.outputs.releases_created }}
+      paths: ${{ steps.rp.outputs.paths_released }}
+    steps:
+      - id: rp
+        uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+  provenance:
+    name: Attach checksummed, attested module archives
+    needs: release-please
+    if: needs.release-please.outputs.releases_created == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Package released modules
+        id: pack
+        env:
+          PATHS: ${{ needs.release-please.outputs.paths }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          for p in $(jq -r '.[]' <<<"$PATHS"); do
+            name=$(basename "$p"); version=$(cat "$p/version.txt")
+            tar --sort=name --mtime='1970-01-01' --owner=0 --group=0 --numeric-owner \
+              -czf "dist/$name-v$version.tar.gz" -C modules "$name"
+            echo "$name/v$version dist/$name-v$version.tar.gz" >> dist/releases.txt
+          done
+          (cd dist && sha256sum *.tar.gz > SHA256SUMS)
+          cat dist/SHA256SUMS
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: dist/*.tar.gz
+      - name: Upload archives and checksums to each release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          while read -r tag file; do
+            gh release upload "$tag" "$file" dist/SHA256SUMS --clobber
+          done < dist/releases.txt

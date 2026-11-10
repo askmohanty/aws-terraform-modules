@@ -11,5 +11,6 @@
         "modules/s3-bucket/README.md"
       ]
     }
-  }
+  },
+  "initial-version": "0.1.0"
 }

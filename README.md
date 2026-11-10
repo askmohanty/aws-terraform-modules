@@ -1,4 +1,4 @@
-# aws-terraform-modules
+# terraform-aws-secure
 
 Hardened, tested Terraform modules for AWS that companies can use as their tier-1 building blocks, with policy-as-code guardrails and a gated pipeline that AI agents can use to compose and deploy tier-2 stacks safely.
 
@@ -19,7 +19,7 @@ More modules are being added; see [catalog/modules.json](catalog/modules.json) f
 
 ## Using a module
 
-Set the stack's `Org` and `Environment` once in the provider's `default_tags`; every module reads them and the provider's region to build names. Pin every module to a release tag:
+Modules are published on the Terraform Registry as one collection, [`askmohanty/secure/aws`](https://registry.terraform.io/modules/askmohanty/secure/aws). Set the stack's `Org` and `Environment` once in the provider's `default_tags`; every module reads them and the provider's region to build names. Pin an exact version:
 
 ```hcl
 provider "aws" {
@@ -30,7 +30,8 @@ provider "aws" {
 }
 
 module "orders_data" {
-  source = "git::https://github.com/askmohanty/aws-terraform-modules.git//modules/s3-bucket?ref=s3-bucket/v0.1.0"
+  source  = "askmohanty/secure/aws//modules/s3-bucket"
+  version = "0.1.0" # x-release-please-version
   name   = "orders-data" # -> acme-prod-euw1-orders-data
 }
 ```

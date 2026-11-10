@@ -11,7 +11,6 @@ modules/<name>/
 ├── main.tf            # resources (split into more files only when main.tf passes ~300 lines)
 ├── outputs.tf         # every output has a description
 ├── README.md          # purpose, security defaults, usage, generated inputs/outputs
-├── version.txt        # managed by release-please
 ├── examples/basic/    # a runnable root module using the module with a provider block
 │   └── main.tf
 └── tests/
@@ -71,9 +70,9 @@ Use `command = apply` when an assertion needs computed values (mocked apply crea
 
 ## Commits and releases
 
-- Conventional commits scoped to the module: `feat(s3-bucket): add replication`, `fix(vpc): ...`. A change touching several modules uses one commit per module where practical.
-- [release-please](https://github.com/googleapis/release-please) opens a release PR per change set; merging it tags `<module>/vX.Y.Z` and publishes a GitHub Release with the module's changelog.
-- Modules start at `0.1.0`. They reach `1.0.0` once they have been applied against a real account, not only tested offline.
+- Conventional commits scoped to the module: `feat(s3-bucket): add replication`, `fix(vpc): ...`.
+- The collection is released as one unit, published on the Terraform Registry as `askmohanty/secure/aws` (modules are used as `askmohanty/secure/aws//modules/<name>`). [release-please](https://github.com/googleapis/release-please) opens a release PR; merging it tags `vX.Y.Z`, which the Registry publishes, and attaches a checksummed, attested archive to the GitHub Release.
+- Versions stay below `1.0.0` until the modules have been applied in a real account, not only tested offline.
 
 ## Checking a module locally
 

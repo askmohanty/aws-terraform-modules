@@ -1,23 +1,15 @@
 {
   "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
   "release-type": "simple",
-  "include-component-in-tag": true,
-  "tag-separator": "/",
-  "separate-pull-requests": false,
-  "group-pull-request-title-pattern": "chore: release modules",
+  "include-component-in-tag": false,
+  "bump-minor-pre-major": true,
   "packages": {
-    "modules/naming": {
-      "component": "naming",
+    ".": {
       "extra-files": [
-        "README.md"
-      ]
-    },
-    "modules/s3-bucket": {
-      "component": "s3-bucket",
-      "extra-files": [
-        "README.md"
+        "README.md",
+        "modules/naming/README.md",
+        "modules/s3-bucket/README.md"
       ]
     }
-  },
-  "bump-minor-pre-major": true
+  }
 }

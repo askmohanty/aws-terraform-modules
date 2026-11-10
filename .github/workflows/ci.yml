@@ -210,6 +210,17 @@ jobs:
           curl -sfLo sums "$base/terraform-docs-$TERRAFORM_DOCS_VERSION.sha256sum"
           grep " $a\$" sums | sha256sum -c -
           tar -xzf "$a" terraform-docs && sudo install terraform-docs /usr/local/bin/
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: 1.17.1
+          terraform_wrapper: false
+      - name: Root module (the Registry entry point) is valid
+        run: |
+          set -euo pipefail
+          terraform fmt -check
+          terraform init -backend=false -input=false && terraform validate
+          missing=$(comm -13 <(terraform console <<<'jsonencode(keys(local.submodules))' | jq -r 'fromjson[]' | sort) <(ls modules | sort))
+          [ -z "$missing" ] || { echo "::error::Add to local.submodules in main.tf: $missing"; exit 1; }
       - name: Regenerate and compare
         run: |
           set -euo pipefail

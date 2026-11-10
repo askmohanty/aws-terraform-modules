@@ -10,7 +10,7 @@ You are writing or changing a **tier-2** Terraform stack: infrastructure for one
 
 ## Rules for tier-2 code
 
-1. **Use only tier-1 modules** from this repository, referenced by the `source` string in the catalog: pinned to a release tag (`?ref=<module>/vX.Y.Z`) or a commit SHA. Never `?ref=main`, never a registry module directly, never a raw `aws_*` resource for something a tier-1 module covers. If a building block is missing, stop and ask for a tier-1 module.
+1. **Use only tier-1 modules** from this collection, from the Terraform Registry with an exact version: `source = "askmohanty/secure/aws//modules/<name>"` and `version = "X.Y.Z"` (the latest release at https://registry.terraform.io/modules/askmohanty/secure/aws). Never a version range, never a git ref to `main`, never another registry module directly, never a raw `aws_*` resource for something a tier-1 module covers. If a building block is missing, stop and ask for a tier-1 module.
 2. **Set the stack's facts once, on the provider.** Modules read the region and `default_tags` from it; never repeat them per module:
    ```hcl
    provider "aws" {

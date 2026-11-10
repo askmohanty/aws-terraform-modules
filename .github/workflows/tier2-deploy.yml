@@ -2,7 +2,7 @@
 #
 #   jobs:
 #     deploy:
-#       uses: askmohanty/aws-terraform-modules/.github/workflows/tier2-deploy.yml@<commit-sha>
+#       uses: askmohanty/terraform-aws-secure/.github/workflows/tier2-deploy.yml@<commit-sha>
 #       with:
 #         environment: dev
 #         working-directory: stacks/orders
@@ -43,7 +43,7 @@ on:
         type: string
         required: true
       policy-ref:
-        description: Commit or tag of askmohanty/aws-terraform-modules whose policies to enforce. Use the same SHA as this workflow.
+        description: Commit or tag of askmohanty/terraform-aws-secure whose policies to enforce. Use the same SHA as this workflow.
         type: string
         required: true
       var-file:
@@ -81,7 +81,7 @@ jobs:
       - name: Check out the policies
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          repository: askmohanty/aws-terraform-modules
+          repository: askmohanty/terraform-aws-secure
           ref: ${{ inputs.policy-ref }}
           path: .tier1
           persist-credentials: false

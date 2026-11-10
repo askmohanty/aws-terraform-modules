@@ -56,8 +56,9 @@ The OIDC roles come from the tier-1 `github-oidc-role` module, scoped to the tie
 
 ## Versions and releases
 
+- One repository named for the Terraform Registry (`terraform-aws-secure`), published once as `askmohanty/secure/aws`. Each tier-1 module is a submodule: `source = "askmohanty/secure/aws//modules/<name>"` with an exact `version`.
+- The whole collection is released together by release-please as `vX.Y.Z`, so modules and the policies that check them always move in lockstep. Versions stay below `1.0.0` until applied against a real account.
 - Terraform `>= 1.9` (cross-variable validation); CI tests Terraform 1.9, the latest Terraform and the latest OpenTofu.
-- Each module is versioned on its own by release-please: tags `<module>/vX.Y.Z`. Modules stay below `1.0.0` until applied against a real account.
 
 ## Repository hardening
 

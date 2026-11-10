@@ -6,7 +6,7 @@
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
-repo="askmohanty/aws-terraform-modules"
+repo="askmohanty/terraform-aws-secure"
 cd "$root"
 mkdir -p catalog
 
@@ -18,9 +18,8 @@ for dir in modules/*/; do
   terraform-docs -c scripts/terraform-docs-json.yml json "$dir" | jq --arg name "$name" --arg summary "$summary" --arg repo "$repo" '{
       name: $name,
       summary: $summary,
-      source: "git::https://github.com/\($repo).git//modules/\($name)?ref=\($name)/vX.Y.Z",
-      release_tag_prefix: "\($name)/v",
-      releases: "https://github.com/\($repo)/releases?q=\($name)%2Fv",
+      source: "askmohanty/secure/aws//modules/\($name)",
+      version: "pin the latest release exactly: https://registry.terraform.io/modules/askmohanty/secure/aws",
       inputs: [.inputs[] | {name, type, required, default, description}],
       outputs: [.outputs[] | {name, description}],
       calls: [.modules[]? | {name, source}]
@@ -32,7 +31,7 @@ jq -s '{repository: "https://github.com/'"$repo"'", tier: 1, modules: .}' "${mod
 rm -f "${modules[@]}"
 
 {
-  echo "# aws-terraform-modules"
+  echo "# terraform-aws-secure"
   echo
   echo "> Hardened tier-1 Terraform modules for AWS. Compose them into tier-2 stacks; never bypass their guardrails."
   echo

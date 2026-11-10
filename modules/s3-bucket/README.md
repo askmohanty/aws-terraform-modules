@@ -28,7 +28,8 @@ provider "aws" {
 }
 
 module "orders_data" {
-  source = "git::https://github.com/askmohanty/aws-terraform-modules.git//modules/s3-bucket?ref=s3-bucket/v0.1.0" # x-release-please-version
+  source  = "askmohanty/secure/aws//modules/s3-bucket"
+  version = "0.1.0" # x-release-please-version
 
   name        = "orders-data"   # -> acme-prod-euw1-orders-data-a1b2
   name_suffix = "a1b2"          # bucket names are global; add a suffix to avoid collisions
@@ -47,7 +48,8 @@ variable "buckets" {
 }
 
 module "bucket" {
-  source   = "git::https://github.com/askmohanty/aws-terraform-modules.git//modules/s3-bucket?ref=s3-bucket/v0.1.0"
+  source  = "askmohanty/secure/aws//modules/s3-bucket"
+  version = "0.1.0" # x-release-please-version
   for_each = var.buckets
 
   name               = each.key              # orders-data -> acme-prod-euw1-orders-data

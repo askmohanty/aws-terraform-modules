@@ -14,22 +14,24 @@ You are writing or changing a **tier-2** Terraform stack: infrastructure for one
 2. **Set the stack's facts once, on the provider.** Modules read the region and `default_tags` from it; never repeat them per module:
    ```hcl
    provider "aws" {
-     region = "eu-west-1"
+     region = var.region
      default_tags {
        tags = {
          Org         = "acme"
-         Environment = "dev"          # dev, test, staging or prod
+         Environment = var.environment   # dev, test, staging or prod, from environments/<env>.tfvars
          Owner       = "orders-team"
        }
      }
    }
    ```
    Give each module a short `name` describing its purpose (`orders-data`, `api`); the naming convention does the rest. Do not put `Org`, `Environment` or `Owner` in a module's `tags`.
-3. **Wire modules through outputs**, as listed under *Composes with*. Never hard-code ARNs, IDs or names that another module outputs.
-4. **Never weaken a guardrail.** Do not look for inputs that disable encryption, logging or deletion protection, and do not add `force_destroy`, public access or wildcard IAM to make an error go away. If a guardrail blocks you, explain why in the pull request and stop.
-5. **No arbitrary code execution**: no `provisioner` blocks, no `data "external"`, no `null_resource` with scripts. The policies deny them.
-6. **No secrets in code.** Use the modules' managed-secret options (for example RDS manages its own master password in Secrets Manager).
-7. **Keep it small**: one root module per stack per environment, so a failure stays contained.
+3. **Plug in the real environment through variables.** Declare `environment`, `region` and any sizes as variables and supply them per environment in `environments/<env>.tfvars`; the deploy workflow passes the right file. The same code is promoted from dev to prod unchanged.
+4. **Many of a thing: `for_each` over a map variable** on the module call, keyed by purpose (see each module's `examples/many`). Never copy-paste module blocks for each instance.
+5. **Wire modules through outputs**, as listed under *Composes with*. Never hard-code ARNs, IDs or names that another module outputs.
+6. **Never weaken a guardrail.** Do not look for inputs that disable encryption, logging or deletion protection, and do not add `force_destroy`, public access or wildcard IAM to make an error go away. If a guardrail blocks you, explain why in the pull request and stop.
+7. **No arbitrary code execution**: no `provisioner` blocks, no `data "external"`, no `null_resource` with scripts. The policies deny them.
+8. **No secrets in code.** Use the modules' managed-secret options (for example RDS manages its own master password in Secrets Manager).
+9. **Keep it small**: one root module per stack per environment, so a failure stays contained.
 
 ## Checking your work locally
 

@@ -46,6 +46,10 @@ on:
         description: Commit or tag of askmohanty/aws-terraform-modules whose policies to enforce. Use the same SHA as this workflow.
         type: string
         required: true
+      var-file:
+        description: Values for this environment, relative to working-directory (e.g. environments/prod.tfvars). The same code is promoted; only these values change.
+        type: string
+        default: ""
       policy-data-dir:
         description: Optional directory in the tier-2 repo with your own config.yaml and exceptions.yaml.
         type: string
@@ -107,9 +111,13 @@ jobs:
           terraform init -input=false
           terraform validate
       - name: Plan
+        env:
+          VAR_FILE: ${{ inputs.var-file }}
         run: |
           set -euo pipefail
-          terraform plan -input=false -out tfplan
+          args=()
+          [ -n "$VAR_FILE" ] && args+=(-var-file="$VAR_FILE")
+          terraform plan -input=false "${args[@]}" -out tfplan
           terraform show -json tfplan > plan.json
           terraform show -no-color tfplan > plan.txt
       - name: Policy check (any denial fails the job)

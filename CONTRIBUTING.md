@@ -36,6 +36,14 @@ Defaults must be the safe choice; anything less safe is an explicit opt-in with 
 - Stateful resources get `deletion_protection` (or equivalent) on by default.
 - Every resource that accepts tags gets `var.tags`.
 
+## Many instances from a map
+
+Tier-2 stacks usually create several of a thing from one map (`for_each` on the module call), with environment values plugged in per environment. Every module therefore:
+
+- works with `for_each` and `count` on the module call (no provider or backend blocks inside, no global names that collide between instances);
+- documents a map-driven usage in its README;
+- has `examples/many/` doing exactly that, with `environment` and `region` as variables. CI validates and policy-checks every directory under `examples/`.
+
 ## Naming from the provider
 
 Every module takes a `name` and reads the stack's facts from the provider: `data "aws_default_tags"` for `Org` and `Environment`, `data "aws_region"` for the region. It calls `modules/naming` for the resource name, sets only `Name`, `Region` and `ManagedBy` (plus caller `tags`, minus any stack tag keys) on resources, and refuses the plan when `Org` or `Environment` is missing. Tests pin both data sources with `override_data`.

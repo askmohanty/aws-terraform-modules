@@ -84,9 +84,13 @@ jobs:
         run: $TF init -backend=false -input=false && $TF validate
       - name: Test (mocked providers, no cloud credentials)
         run: $TF test
-      - name: Validate example
-        working-directory: modules/${{ matrix.module }}/examples/basic
-        run: $TF init -backend=false -input=false && $TF validate
+      - name: Validate every example
+        run: |
+          set -euo pipefail
+          for ex in examples/*/; do
+            echo "== $ex"
+            (cd "$ex" && $TF init -backend=false -input=false >/dev/null && $TF validate)
+          done
 
   lint:
     name: ${{ matrix.module }} (tflint, docs)
@@ -178,14 +182,14 @@ jobs:
         run: |
           set -euo pipefail
           for m in $(jq -r '.[]' <<<"$MODULES"); do
-            dir="modules/$m/examples/basic"
-            [ -d "$dir" ] || continue
-            echo "::group::$m"
-            (cd "$dir" && terraform init -backend=false -input=false >/dev/null \
-              && terraform plan -input=false -out tfplan >/dev/null \
-              && terraform show -json tfplan > plan.json)
-            conftest test "$dir/plan.json" -p policies --data policies/data --all-namespaces
-            echo "::endgroup::"
+            for dir in modules/"$m"/examples/*/; do
+              echo "::group::$dir"
+              (cd "$dir" && terraform init -backend=false -input=false >/dev/null \
+                && terraform plan -input=false -out tfplan >/dev/null \
+                && terraform show -json tfplan > plan.json)
+              conftest test "$dir/plan.json" -p policies --data policies/data --all-namespaces
+              echo "::endgroup::"
+            done
           done
       - name: The insecure fixture is denied by every expected rule
         run: bash scripts/check-policy-fixture.sh

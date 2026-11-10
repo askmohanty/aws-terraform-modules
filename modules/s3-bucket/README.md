@@ -36,6 +36,28 @@ module "orders_data" {
 }
 ```
 
+### Many buckets from a map
+
+```hcl
+variable "buckets" {
+  type = map(object({
+    versioning_enabled = optional(bool, true)
+    lifecycle_rules    = optional(list(any), [])
+  }))
+}
+
+module "bucket" {
+  source   = "git::https://github.com/askmohanty/aws-terraform-modules.git//modules/s3-bucket?ref=s3-bucket/v0.1.0"
+  for_each = var.buckets
+
+  name               = each.key              # orders-data -> acme-prod-euw1-orders-data
+  versioning_enabled = each.value.versioning_enabled
+  lifecycle_rules    = each.value.lifecycle_rules
+}
+```
+
+See [examples/many](examples/many/main.tf).
+
 ## Composes with
 
 | Use this output | As this input |

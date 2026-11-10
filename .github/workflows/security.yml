@@ -1,0 +1,72 @@
+# Security scans that report to this repository's Security tab.
+name: Security
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "17 4 * * 1"
+
+permissions:
+  contents: read
+
+env:
+  ZIZMOR_VERSION: v1.32.0
+  ZIZMOR_SHA256: bb110cc765eca9cd7efb2e284a956be5974c60027b0970f16397d86208a9957b
+  TRIVY_VERSION: 0.76.2
+
+jobs:
+  workflows:
+    name: Workflow security (zizmor)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install zizmor (checksum verified)
+        run: |
+          set -euo pipefail
+          a=zizmor-x86_64-unknown-linux-gnu.tar.gz
+          curl -sfLO "https://github.com/zizmorcore/zizmor/releases/download/$ZIZMOR_VERSION/$a"
+          echo "$ZIZMOR_SHA256  $a" | sha256sum -c -
+          tar -xzf "$a" && sudo install zizmor /usr/local/bin/
+      - name: Scan workflows
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: zizmor --format sarif .github/workflows > zizmor.sarif || true
+      - uses: github/codeql-action/upload-sarif@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
+        with:
+          sarif_file: zizmor.sarif
+          category: zizmor
+      - name: Fail on high-severity findings
+        run: zizmor --min-severity high .github/workflows
+
+  iac:
+    name: IaC misconfiguration (Trivy)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install Trivy (checksum verified)
+        run: |
+          set -euo pipefail
+          a="trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
+          base="https://github.com/aquasecurity/trivy/releases/download/v$TRIVY_VERSION"
+          curl -sfLO "$base/$a"
+          curl -sfLo sums "$base/trivy_${TRIVY_VERSION}_checksums.txt"
+          grep " $a\$" sums | sha256sum -c -
+          tar -xzf "$a" trivy && sudo install trivy /usr/local/bin/
+      - name: "Scan modules (fixtures are excluded because they are insecure on purpose)"
+        run: trivy config --format sarif --output trivy.sarif --skip-dirs policies/fixtures modules
+      - uses: github/codeql-action/upload-sarif@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
+        with:
+          sarif_file: trivy.sarif
+          category: trivy-iac

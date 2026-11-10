@@ -7,5 +7,4 @@ Machine-readable catalog of every input and output: [catalog/modules.json](catal
 
 ## Modules
 
-- [naming](modules/naming/README.md): Builds resource names (`{org}-{environment}-{region_short}-{name}`) and the standard tag set every module applies.
 - [s3-bucket](modules/s3-bucket/README.md): A private, encrypted, versioned S3 bucket that refuses public access and insecure transport.

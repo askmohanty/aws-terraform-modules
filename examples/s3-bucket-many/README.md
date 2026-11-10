@@ -60,12 +60,6 @@ module "bucket" {
 
 No providers.
 
-## Modules
-
-| Name | Source | Version |
-| ---- | ------ | ------- |
-| bucket | ../../modules/s3-bucket | n/a |
-
 ## Resources
 
 No resources.

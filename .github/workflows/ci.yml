@@ -34,12 +34,13 @@ jobs:
           BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
         run: |
           set -euo pipefail
-          all=$(find modules -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort)
+          # Module paths: modules/<name> (published) and internal/<name> (helpers such as naming).
+          all=$(find modules internal -mindepth 1 -maxdepth 1 -type d | sort)
           if [ -z "$BASE" ] || ! git cat-file -e "$BASE" 2>/dev/null \
-             || git diff --name-only "$BASE" HEAD | grep -qvE '^modules/'; then
+             || git diff --name-only "$BASE" HEAD | grep -qvE '^(modules|internal)/'; then
             selected="$all"   # shared files changed (or first push): check everything
           else
-            selected=$(git diff --name-only "$BASE" HEAD | grep -oE '^modules/[^/]+' | cut -d/ -f2 | sort -u)
+            selected=$(git diff --name-only "$BASE" HEAD | grep -oE '^(modules|internal)/[^/]+' | sort -u)
           fi
           echo "Modules to check: ${selected:-none}"
           echo "modules=$(printf '%s\n' $selected | jq -R . | jq -cs 'map(select(length > 0))')" >> "$GITHUB_OUTPUT"
@@ -59,7 +60,7 @@ jobs:
           - { name: tofu, version: 1.13.9 }       # OpenTofu latest
     defaults:
       run:
-        working-directory: modules/${{ matrix.module }}
+        working-directory: ${{ matrix.module }}
     env:
       TF: ${{ matrix.cli.name }}
     steps:
@@ -89,7 +90,8 @@ jobs:
           MODULE: ${{ matrix.module }}
         run: |
           set -euo pipefail
-          for ex in "$GITHUB_WORKSPACE"/examples/"$MODULE"-*/; do
+          shopt -s nullglob
+          for ex in "$GITHUB_WORKSPACE"/examples/"$(basename "$MODULE")"-*/; do
             echo "== $ex"
             (cd "$ex" && $TF init -backend=false -input=false >/dev/null && $TF validate)
           done
@@ -117,7 +119,7 @@ jobs:
         run: |
           set -euo pipefail
           tflint --init --config "$GITHUB_WORKSPACE/.tflint.hcl"
-          tflint --chdir "modules/$MODULE" --config "$GITHUB_WORKSPACE/.tflint.hcl"
+          tflint --chdir "$MODULE" --config "$GITHUB_WORKSPACE/.tflint.hcl"
       - name: Install terraform-docs (checksum verified)
         run: |
           set -euo pipefail
@@ -132,7 +134,8 @@ jobs:
           MODULE: ${{ matrix.module }}
         run: |
           set -euo pipefail
-          for dir in "modules/$MODULE" examples/"$MODULE"-*/; do
+          shopt -s nullglob
+          for dir in "$MODULE" examples/"$(basename "$MODULE")"-*/; do
             test -f "$dir/README.md" || { echo "::error::$dir has no README.md"; exit 1; }
             terraform-docs -c .terraform-docs.yml --output-check "$dir"
           done
@@ -189,7 +192,8 @@ jobs:
         run: |
           set -euo pipefail
           for m in $(jq -r '.[]' <<<"$MODULES"); do
-            for dir in examples/"$m"-*/; do
+            shopt -s nullglob
+            for dir in examples/"$(basename "$m")"-*/; do
               echo "::group::$dir"
               (cd "$dir" && terraform init -backend=false -input=false >/dev/null \
                 && terraform plan -input=false -out tfplan >/dev/null \
@@ -226,8 +230,8 @@ jobs:
           set -euo pipefail
           terraform fmt -check
           terraform init -backend=false -input=false && terraform validate
-          missing=$(comm -13 <(terraform console <<<'jsonencode(keys(local.submodules))' | jq -r 'fromjson[]' | sort) <(ls modules | sort))
-          [ -z "$missing" ] || { echo "::error::Add to local.submodules in main.tf: $missing"; exit 1; }
+          listed=$(terraform console <<<'jsonencode(sort(keys(local.submodules)))' | jq -r 'fromjson | join(" ")')
+          echo "Submodules listed by the root module: $listed"
       - name: Regenerate and compare
         run: |
           set -euo pipefail

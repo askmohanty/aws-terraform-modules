@@ -4,7 +4,7 @@ A private, encrypted, versioned S3 bucket that refuses public access and insecur
 
 ## What it creates
 
-The bucket, its ownership controls (ACLs disabled), public access block, versioning, KMS default encryption, lifecycle rules, an optional access-logging target and a bucket policy. It wraps [terraform-aws-modules/s3-bucket](https://github.com/terraform-aws-modules/terraform-aws-s3-bucket) v5.17.0, pinned to commit `9afa4fc8`.
+The bucket, its ownership controls (ACLs disabled), public access block, versioning, KMS default encryption, lifecycle rules, an optional access-logging target and a bucket policy.
 
 ## Security guarantees
 
@@ -83,13 +83,6 @@ See [examples/s3-bucket-many](https://github.com/askmohanty/terraform-aws-harden
 | ---- | ------- |
 | aws | >= 6.44, < 7.0 |
 | terraform | n/a |
-
-## Modules
-
-| Name | Source | Version |
-| ---- | ------ | ------- |
-| bucket | git::https://github.com/terraform-aws-modules/terraform-aws-s3-bucket.git | 9afa4fc8c8f1e0b3fd913474c1bef8d0c454b235 |
-| naming | ../naming | n/a |
 
 ## Resources
 

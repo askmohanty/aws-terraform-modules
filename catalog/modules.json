@@ -3,90 +3,6 @@
   "tier": 1,
   "modules": [
     {
-      "name": "naming",
-      "summary": "Builds resource names (`{org}-{environment}-{region_short}-{name}`) and the standard tag set every module applies.",
-      "source": "askmohanty/hardened-modules/aws//modules/naming",
-      "version": "pin the latest release exactly: https://registry.terraform.io/modules/askmohanty/hardened-modules/aws",
-      "inputs": [
-        {
-          "name": "allowed_environments",
-          "type": "list(string)",
-          "required": false,
-          "default": [
-            "dev",
-            "test",
-            "staging",
-            "prod"
-          ],
-          "description": "Environments this organisation uses. Keep it in step with the OPA policy data (`policies/data/config.yaml`)."
-        },
-        {
-          "name": "cost_centre",
-          "type": "string",
-          "required": false,
-          "default": null,
-          "description": "Cost centre, added as the `CostCentre` tag."
-        },
-        {
-          "name": "environment",
-          "type": "string",
-          "required": true,
-          "default": null,
-          "description": "Environment, the second part of every name. Must be one of `allowed_environments`."
-        },
-        {
-          "name": "extra_tags",
-          "type": "map(string)",
-          "required": false,
-          "default": {},
-          "description": "Additional tags. The standard tags (`Name`, `Org`, `Environment`, `Region`, `ManagedBy`, `Owner`, `CostCentre`) always win over these."
-        },
-        {
-          "name": "name",
-          "type": "string",
-          "required": true,
-          "default": null,
-          "description": "What the resource is for, the last part of the name (e.g. `orders-db`)."
-        },
-        {
-          "name": "org",
-          "type": "string",
-          "required": true,
-          "default": null,
-          "description": "Short organisation code, the first part of every name (e.g. `acme`)."
-        },
-        {
-          "name": "owner",
-          "type": "string",
-          "required": false,
-          "default": null,
-          "description": "Team or person accountable for the resource, added as the `Owner` tag."
-        },
-        {
-          "name": "region",
-          "type": "string",
-          "required": true,
-          "default": null,
-          "description": "AWS region the resources live in (e.g. `eu-west-1`). Shortened in names: `eu-west-1` becomes `euw1`."
-        }
-      ],
-      "outputs": [
-        {
-          "name": "id",
-          "description": "Full resource name: `{org}-{environment}-{region_short}-{name}`, e.g. `acme-prod-euw1-orders-db`."
-        },
-        {
-          "name": "region_short",
-          "description": "Short region code used in names, e.g. `euw1`."
-        },
-        {
-          "name": "tags",
-          "description": "Tags every resource gets: `extra_tags` overlaid by the standard tags."
-        }
-      ],
-      "calls": []
-    },
-    {
       "name": "s3-bucket",
       "summary": "A private, encrypted, versioned S3 bucket that refuses public access and insecure transport.",
       "source": "askmohanty/hardened-modules/aws//modules/s3-bucket",
@@ -196,7 +112,7 @@
         },
         {
           "name": "naming",
-          "source": "../naming"
+          "source": "../../internal/naming"
         }
       ]
     }

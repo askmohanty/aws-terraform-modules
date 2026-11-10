@@ -17,3 +17,6 @@ settings:
   required: true
   sensitive: true
   type: true
+sections:
+  hide:
+    - modules

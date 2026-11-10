@@ -30,7 +30,7 @@ Remove it with `terraform destroy` (outside `prod`, add `force_destroy = true` f
 ```hcl
 module "orders_data" {
   source  = "askmohanty/hardened-modules/aws//modules/s3-bucket"
-  version = "0.3.0" # x-release-please-version
+  version = "0.4.0" # x-release-please-version
 
   name        = "orders-data"
   name_suffix = "a1b2"

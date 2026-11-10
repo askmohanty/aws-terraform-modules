@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.4.0](https://github.com/askmohanty/terraform-aws-hardened-modules/compare/v0.3.0...v0.4.0) (2026-11-10)
+
+
+### ⚠ BREAKING CHANGES
+
+* **s3-bucket:** own resources with no module dependencies ([#13](https://github.com/askmohanty/terraform-aws-hardened-modules/issues/13))
+
+### Features
+
+* **s3-bucket:** own resources with no module dependencies ([#13](https://github.com/askmohanty/terraform-aws-hardened-modules/issues/13)) ([923e2b1](https://github.com/askmohanty/terraform-aws-hardened-modules/commit/923e2b1a7e4c5a3699c05d3a6d3f8d6a8543a91a))
+
 ## [0.3.0](https://github.com/askmohanty/terraform-aws-hardened-modules/compare/v0.2.0...v0.3.0) (2026-11-10)
 
 

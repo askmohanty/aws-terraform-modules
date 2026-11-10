@@ -49,12 +49,6 @@ module "orders_data" {
 
 No providers.
 
-## Modules
-
-| Name | Source | Version |
-| ---- | ------ | ------- |
-| orders\_data | ../../modules/s3-bucket | n/a |
-
 ## Resources
 
 No resources.

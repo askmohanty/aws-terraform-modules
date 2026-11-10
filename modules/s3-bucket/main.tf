@@ -11,7 +11,7 @@ locals {
 }
 
 module "naming" {
-  source = "../naming"
+  source = "../../internal/naming"
 
   org         = local.stack_ok ? local.stack_tags["Org"] : "unset"
   environment = local.stack_ok ? local.stack_tags["Environment"] : "dev"

@@ -52,7 +52,7 @@ Tier-2 stacks usually create several of a thing from one map (`for_each` on the 
 
 ## Naming from the provider
 
-Every module takes a `name` and reads the stack's facts from the provider: `data "aws_default_tags"` for `Org` and `Environment`, `data "aws_region"` for the region. It calls `modules/naming` for the resource name, sets only `Name`, `Region` and `ManagedBy` (plus caller `tags`, minus any stack tag keys) on resources, and refuses the plan when `Org` or `Environment` is missing. Tests pin both data sources with `override_data`.
+Every module takes a `name` and reads the stack's facts from the provider: `data "aws_default_tags"` for `Org` and `Environment`, `data "aws_region"` for the region. It calls `internal/naming` for the resource name, sets only `Name`, `Region` and `ManagedBy` (plus caller `tags`, minus any stack tag keys) on resources, and refuses the plan when `Org` or `Environment` is missing. Tests pin both data sources with `override_data`.
 
 ## Inputs and outputs
 

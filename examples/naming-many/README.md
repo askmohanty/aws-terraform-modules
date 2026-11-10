@@ -25,7 +25,7 @@ terraform plan -var environment=prod    # prod names
 ```hcl
 module "name" {
   source   = "askmohanty/hardened-modules/aws//modules/naming"
-  version  = "0.1.0" # x-release-please-version
+  version  = "0.2.0" # x-release-please-version
   for_each = toset(["orders-queue", "orders-dlq"])
 
   org         = "acme"

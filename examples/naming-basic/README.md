@@ -18,7 +18,7 @@ terraform plan   # shows the name and tags as outputs
 ```hcl
 module "queue_name" {
   source  = "askmohanty/hardened-modules/aws//modules/naming"
-  version = "0.1.0" # x-release-please-version
+  version = "0.2.0" # x-release-please-version
 
   org         = "acme"
   environment = "prod"

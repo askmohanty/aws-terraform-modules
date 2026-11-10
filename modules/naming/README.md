@@ -17,7 +17,7 @@ Nothing: it computes values. Every other module calls it internally with `Org` a
 ```hcl
 module "name" {
   source  = "askmohanty/hardened-modules/aws//modules/naming"
-  version = "0.1.0" # x-release-please-version
+  version = "0.2.0" # x-release-please-version
 
   org         = "acme"
   environment = "prod"

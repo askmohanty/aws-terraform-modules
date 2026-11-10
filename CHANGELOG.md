@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/askmohanty/terraform-aws-hardened-modules/compare/v0.2.0...v0.3.0) (2026-11-10)
+
+
+### Features
+
+* Registry landing README, internal naming helper, automatic submodule list ([#11](https://github.com/askmohanty/terraform-aws-hardened-modules/issues/11)) ([0aa81ca](https://github.com/askmohanty/terraform-aws-hardened-modules/commit/0aa81caae7c48921fcdf381bf130df7caf8d95b1))
+
 ## [0.2.0](https://github.com/askmohanty/terraform-aws-hardened-modules/compare/v0.1.0...v0.2.0) (2026-11-10)
 
 

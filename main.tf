@@ -1,5 +1,5 @@
-# Root module of the collection (askmohanty/secure/aws). It creates nothing: the building blocks are
-# the submodules under modules/, used as `askmohanty/secure/aws//modules/<name>`. It exists because
+# Root module of the collection (askmohanty/hardened-modules/aws). It creates nothing: the building blocks are
+# the submodules under modules/, used as `askmohanty/hardened-modules/aws//modules/<name>`. It exists because
 # the Terraform Registry requires a root module, and it lists what the collection contains.
 locals {
   submodules = {

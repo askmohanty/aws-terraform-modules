@@ -43,7 +43,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p dist
-          name="terraform-aws-secure-$TAG"
+          name="terraform-aws-hardened-modules-$TAG"
           git archive --format=tar.gz --prefix="$name/" -o "dist/$name.tar.gz" HEAD
           (cd dist && sha256sum ./*.tar.gz > SHA256SUMS && cat SHA256SUMS)
       - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2

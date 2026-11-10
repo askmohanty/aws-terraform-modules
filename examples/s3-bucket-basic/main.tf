@@ -23,7 +23,7 @@ provider "aws" {
 }
 
 module "orders_data" {
-  source = "../.."
+  source = "../../modules/s3-bucket"
 
   name        = "orders-data" # -> acme-dev-euw1-orders-data-ex1
   name_suffix = "ex1"         # bucket names are global; a suffix avoids collisions
@@ -36,9 +36,11 @@ module "orders_data" {
 }
 
 output "bucket_name" {
-  value = module.orders_data.name
+  description = "Name of the bucket, built from the naming convention."
+  value       = module.orders_data.name
 }
 
 output "bucket_arn" {
-  value = module.orders_data.arn
+  description = "ARN of the bucket, for IAM policies."
+  value       = module.orders_data.arn
 }

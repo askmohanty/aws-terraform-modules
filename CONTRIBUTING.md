@@ -11,11 +11,18 @@ modules/<name>/
 ├── main.tf            # resources (split into more files only when main.tf passes ~300 lines)
 ├── outputs.tf         # every output has a description
 ├── README.md          # purpose, security defaults, usage, generated inputs/outputs
-├── examples/basic/    # a runnable root module using the module with a provider block
-│   └── main.tf
 └── tests/
     └── *.tftest.hcl   # offline tests with mocked providers
 ```
+
+Examples live at the top level, where the Terraform Registry lists them, one directory per example:
+
+```
+examples/<name>-basic/   # the module with its defaults: README.md + main.tf
+examples/<name>-many/    # many instances from a map, environment values as variables
+```
+
+Each example has a README with what it builds, how to run it, and generated inputs and outputs.
 
 ## Versions
 
@@ -41,7 +48,7 @@ Tier-2 stacks usually create several of a thing from one map (`for_each` on the 
 
 - works with `for_each` and `count` on the module call (no provider or backend blocks inside, no global names that collide between instances);
 - documents a map-driven usage in its README;
-- has `examples/many/` doing exactly that, with `environment` and `region` as variables. CI validates and policy-checks every directory under `examples/`.
+- has `examples/<name>-many/` doing exactly that, with `environment` and `region` as variables. CI validates, documents and policy-checks every example.
 
 ## Naming from the provider
 
@@ -72,7 +79,7 @@ Use `command = apply` when an assertion needs computed values (mocked apply crea
 
 - Conventional commits scoped to the module: `feat(s3-bucket): add replication`, `fix(vpc): ...`.
 - Pull requests are squash-merged, so the **PR title** becomes the commit release-please reads: write it as a conventional commit (`feat(s3-bucket): ...`, `fix: ...`, `docs: ...`).
-- The collection is released as one unit, published on the Terraform Registry as `askmohanty/secure/aws` (modules are used as `askmohanty/secure/aws//modules/<name>`). [release-please](https://github.com/googleapis/release-please) opens a release PR; merging it tags `vX.Y.Z`, which the Registry publishes, and attaches a checksummed, attested archive to the GitHub Release.
+- The collection is released as one unit, published on the Terraform Registry as `askmohanty/hardened-modules/aws` (modules are used as `askmohanty/hardened-modules/aws//modules/<name>`). [release-please](https://github.com/googleapis/release-please) opens a release PR; merging it tags `vX.Y.Z`, which the Registry publishes, and attaches a checksummed, attested archive to the GitHub Release.
 - Versions stay below `1.0.0` until the modules have been applied in a real account, not only tested offline.
 
 ## Checking a module locally
@@ -84,5 +91,5 @@ terraform init -backend=false && terraform validate
 terraform test
 tflint --init --config ../../.tflint.hcl && tflint --config ../../.tflint.hcl
 terraform-docs -c ../../.terraform-docs.yml .
-(cd examples/basic && terraform init -backend=false && terraform validate)
+(cd ../../examples/<name>-basic && terraform init -backend=false && terraform validate)
 ```

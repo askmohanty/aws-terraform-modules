@@ -1,4 +1,4 @@
-# terraform-aws-secure
+# terraform-aws-hardened-modules
 
 > Hardened tier-1 Terraform modules for AWS. Compose them into tier-2 stacks; never bypass their guardrails.
 

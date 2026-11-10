@@ -1,12 +1,12 @@
 {
-  "repository": "https://github.com/askmohanty/terraform-aws-secure",
+  "repository": "https://github.com/askmohanty/terraform-aws-hardened-modules",
   "tier": 1,
   "modules": [
     {
       "name": "naming",
       "summary": "Builds resource names (`{org}-{environment}-{region_short}-{name}`) and the standard tag set every module applies.",
-      "source": "askmohanty/secure/aws//modules/naming",
-      "version": "pin the latest release exactly: https://registry.terraform.io/modules/askmohanty/secure/aws",
+      "source": "askmohanty/hardened-modules/aws//modules/naming",
+      "version": "pin the latest release exactly: https://registry.terraform.io/modules/askmohanty/hardened-modules/aws",
       "inputs": [
         {
           "name": "allowed_environments",
@@ -89,8 +89,8 @@
     {
       "name": "s3-bucket",
       "summary": "A private, encrypted, versioned S3 bucket that refuses public access and insecure transport.",
-      "source": "askmohanty/secure/aws//modules/s3-bucket",
-      "version": "pin the latest release exactly: https://registry.terraform.io/modules/askmohanty/secure/aws",
+      "source": "askmohanty/hardened-modules/aws//modules/s3-bucket",
+      "version": "pin the latest release exactly: https://registry.terraform.io/modules/askmohanty/hardened-modules/aws",
       "inputs": [
         {
           "name": "access_logging",

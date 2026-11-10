@@ -32,7 +32,7 @@ conftest test plan.json -p policies --data policies/data --all-namespaces
 - Rules are Rego v1, one file per concern, each with unit tests (`*_test.rego`) that include known-bad fixtures.
 - `policies/data/config.yaml` holds the organisation's settings: allowed environments, the naming pattern, required tags. Companies override this file, not the rules.
 - **Exceptions** are explicit: an entry in `policies/data/exceptions.yaml` names the resource address, the rule, the reason, who approved it and an expiry date. Expired exceptions stop applying automatically.
-- CI proves the policies: `opa test` on the rule unit tests, and every module's example is planned against LocalStack (an AWS emulator, so no real account) and must pass the policies.
+- CI proves the policies: `opa test` on the rule unit tests, and every module's example is planned against LocalStack (an AWS emulator, so no real account) and must pass the policies. LocalStack is pinned to its last community release (`4`), which runs without a licence; if its AWS coverage falls behind, move to Moto or a licensed LocalStack.
 
 ## Deploying tier 2 (agents included)
 

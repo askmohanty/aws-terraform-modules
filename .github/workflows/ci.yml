@@ -132,8 +132,9 @@ jobs:
     runs-on: ubuntu-latest
     services:
       localstack:
-        # AWS emulator so plans can run without an AWS account. Pinned by digest (2026.10.6).
-        image: localstack/localstack@sha256:f94401988db4c01a5b2634d37d698a9b11c93f74c1ad0f7a8849f5ebd73dcbdc
+        # AWS emulator so plans can run without an AWS account. Pinned by digest to the `4` tag, the
+        # last community release that runs without a licence (2026.x images require one).
+        image: localstack/localstack@sha256:3ebc37595918b8accb852f8048fef2aff047d465167edd655528065b07bc364a
         ports:
           - 4566:4566
     env:

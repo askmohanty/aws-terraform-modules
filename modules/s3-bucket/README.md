@@ -38,7 +38,7 @@ provider "aws" {
 ```hcl
 module "orders_data" {
   source  = "askmohanty/hardened-modules/aws//modules/s3-bucket"
-  version = "0.3.0" # x-release-please-version
+  version = "0.4.0" # x-release-please-version
 
   name        = "orders-data" # -> acme-prod-euw1-orders-data-a1b2
   name_suffix = "a1b2"        # bucket names are global; a suffix avoids collisions
@@ -50,7 +50,7 @@ module "orders_data" {
 ```hcl
 module "orders_data" {
   source  = "askmohanty/hardened-modules/aws//modules/s3-bucket"
-  version = "0.3.0" # x-release-please-version
+  version = "0.4.0" # x-release-please-version
 
   name        = "orders-data"
   name_suffix = "a1b2"
@@ -63,7 +63,7 @@ module "orders_data" {
 ```hcl
 module "exports" {
   source  = "askmohanty/hardened-modules/aws//modules/s3-bucket"
-  version = "0.3.0" # x-release-please-version
+  version = "0.4.0" # x-release-please-version
 
   name        = "exports"
   name_suffix = "a1b2"
@@ -87,7 +87,7 @@ Your statements are added after the built-in deny statements. Grant access to sp
 ```hcl
 module "reports" {
   source  = "askmohanty/hardened-modules/aws//modules/s3-bucket"
-  version = "0.3.0" # x-release-please-version
+  version = "0.4.0" # x-release-please-version
 
   name        = "reports"
   name_suffix = "a1b2"
@@ -117,7 +117,7 @@ variable "buckets" {
 
 module "bucket" {
   source   = "askmohanty/hardened-modules/aws//modules/s3-bucket"
-  version  = "0.3.0" # x-release-please-version
+  version  = "0.4.0" # x-release-please-version
   for_each = var.buckets
 
   name               = each.key # orders-data -> acme-prod-euw1-orders-data

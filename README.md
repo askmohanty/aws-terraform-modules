@@ -28,7 +28,7 @@ provider "aws" {
 
 module "orders_data" {
   source  = "askmohanty/hardened-modules/aws//modules/s3-bucket"
-  version = "0.3.0" # x-release-please-version
+  version = "0.4.0" # x-release-please-version
 
   name        = "orders-data" # -> acme-prod-euw1-orders-data-a1b2
   name_suffix = "a1b2"

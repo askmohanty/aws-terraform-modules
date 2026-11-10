@@ -39,7 +39,7 @@ In prod the module refuses `force_destroy` and disabled versioning, whatever the
 ```hcl
 module "bucket" {
   source   = "askmohanty/hardened-modules/aws//modules/s3-bucket"
-  version  = "0.3.0" # x-release-please-version
+  version  = "0.4.0" # x-release-please-version
   for_each = var.buckets
 
   name               = each.key
